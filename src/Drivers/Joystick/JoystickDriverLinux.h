@@ -39,7 +39,7 @@ public:
      */
     virtual void init();
 
-    virtual void start();
+    virtual void start(JoystickToMIDIMapper *joystickToMIDIMapper);
 
     virtual void stop();
 

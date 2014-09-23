@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Michael Gregorius
+ * Copyright (C) 2011 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -18,33 +18,35 @@
  */
 
 
-#ifndef JOYSTICKDRIVER_H
-#define JOYSTICKDRIVER_H
+#include "JoystickToMIDIMapper.h"
+#include "MIDIInterface.h"
 
-
-#include <string>
-
-class Joystick;
-class JoystickToMIDIMapper;
-
-class JoystickDriver
+JoystickToMIDIMapper::JoystickToMIDIMapper() :
+    m_midiInterface(0)
 {
-public:
-    JoystickDriver();
-    virtual ~JoystickDriver();
+}
 
-    virtual Joystick getJoystick() const = 0;
+JoystickToMIDIMapper::~JoystickToMIDIMapper()
+{
+}
 
-    /**
-     * Initializes the driver.
-     *
-     * Must be called before any of the other methods is called.
-     */
-    virtual void init() = 0;
+void JoystickToMIDIMapper::setMIDIInterface(MIDIInterface *midiInterface)
+{
+    m_midiInterface = midiInterface;
+}
 
-    virtual void start(JoystickToMIDIMapper *joystickToMIDIMapper) = 0;
+void JoystickToMIDIMapper::processJoystickEventButtonDown()
+{
+    if (m_midiInterface)
+    {
+        m_midiInterface->sendNoteOn();
+    }
+}
 
-    virtual void stop() = 0;
-};
-
-#endif
+void JoystickToMIDIMapper::processJoystickEventButtonUp()
+{
+    if (m_midiInterface)
+    {
+        m_midiInterface->sendNoteOff();
+    }
+}

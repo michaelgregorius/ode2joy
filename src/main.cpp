@@ -21,6 +21,7 @@
 #include "Joystick.h"
 #include "Drivers/Joystick/JoystickDriverLinux.h"
 #include "MIDIInterfaceALSA.h"
+#include "JoystickToMIDIMapper.h"
 
 #include <iostream>
 #include <chrono>
@@ -39,17 +40,23 @@ int main (int argc, char **argv)
     std::cout << "Number of axis: " << joystick.getNumberOfAxis() << std::endl;
     std::cout << "Number of buttons: " << joystick.getNumberOfButtons() << std::endl;
 
-    joystickDriver->start();
-
-    std::cout << "Sleeping..." << std::endl;
-    std::chrono::milliseconds duration(10000);
-    std::this_thread::sleep_for(duration);
-    std::cout << "Sleeping ended" << std::endl;
-
-    joystickDriver->stop();
-
     // Create MIDI interface
     MIDIInterface *midiInterface = new MIDIInterfaceALSA();
+
+    JoystickToMIDIMapper mapper;
+    mapper.setMIDIInterface(midiInterface);
+
+    joystickDriver->start(&mapper);
+
+    while (true)
+    {
+        std::cout << "Sleeping..." << std::endl;
+        std::chrono::milliseconds duration(10000);
+        std::this_thread::sleep_for(duration);
+        std::cout << "Sleeping ended" << std::endl;
+    }
+
+    joystickDriver->stop();
 
     delete joystickDriver;
     delete midiInterface;

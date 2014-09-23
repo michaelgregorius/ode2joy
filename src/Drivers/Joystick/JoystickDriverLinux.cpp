@@ -22,6 +22,7 @@
 #include "JoystickDriverLinux.h"
 
 #include "Joystick.h"
+#include "JoystickToMIDIMapper.h"
 
 #include <iostream>
 
@@ -62,7 +63,7 @@ void printEventInfo(js_event const & event) {
     std::cout << std::endl;
 }
 
-void process_in_thread(int joy_fd)
+void process_in_thread(int joy_fd, JoystickToMIDIMapper *joystickToMIDIMapper)
 {
     struct js_event event;
 
@@ -78,8 +79,15 @@ void process_in_thread(int joy_fd)
             if (event.type == JS_EVENT_BUTTON)
             {
                 printEventInfo(event);
-                //bool buttonDown = (bool) event.value;
-                //m_buttonState = buttonDown ? Down : Up;
+                bool buttonDown = (bool) event.value;
+                if (buttonDown)
+                {
+                    joystickToMIDIMapper->processJoystickEventButtonDown();
+                }
+                else
+                {
+                    joystickToMIDIMapper->processJoystickEventButtonUp();
+                }
             }
 
             if (event.type == JS_EVENT_AXIS)
@@ -97,7 +105,7 @@ void process_in_thread(int joy_fd)
         }
 
         // TODO MGR: Is this the way to do it? It seems clumsy (but it works).
-        std::chrono::milliseconds duration(10);
+        std::chrono::milliseconds duration(5);
         std::this_thread::sleep_for(duration);
     }
 }
@@ -142,11 +150,11 @@ void JoystickDriverLinux::init()
     // All done in the constructor
 }
 
-void JoystickDriverLinux::start()
+void JoystickDriverLinux::start(JoystickToMIDIMapper *joystickToMIDIMapper)
 {
     started = true;
 
-    processThread = std::thread(process_in_thread, m_joy_fd);
+    processThread = std::thread(process_in_thread, m_joy_fd, joystickToMIDIMapper);
 }
 
 void JoystickDriverLinux::stop()

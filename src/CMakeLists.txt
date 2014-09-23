@@ -25,12 +25,14 @@ set (ODE2JOY_SRCS
   JoystickDriver.cpp
   Drivers/Joystick/JoystickDriverLinux.cpp
   Joystick.cpp
+  JoystickToMIDIMapper.cpp
   MIDIInterfaceALSA.cpp
 )
 
 set (ODE2JOY_HEADERS
   JoystickDriver.h
   MIDIInterface.h
+  JoystickToMIDIMapper.h
   Drivers/Joystick/JoystickDriverLinux.h
 )
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Michael Gregorius
+ * Copyright (C) 2011 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -18,33 +18,29 @@
  */
 
 
-#ifndef JOYSTICKDRIVER_H
-#define JOYSTICKDRIVER_H
+#ifndef JOYSTICKTOMIDIMAPPER_H
+#define JOYSTICKTOMIDIMAPPER_H
 
 
-#include <string>
+class MIDIInterface;
 
-class Joystick;
-class JoystickToMIDIMapper;
 
-class JoystickDriver
+/**
+ * @brief Performs the mapping from joystick events to MIDI events.
+ */
+class JoystickToMIDIMapper
 {
 public:
-    JoystickDriver();
-    virtual ~JoystickDriver();
+    JoystickToMIDIMapper();
+    ~JoystickToMIDIMapper();
 
-    virtual Joystick getJoystick() const = 0;
+    void setMIDIInterface(MIDIInterface *midiInterface);
 
-    /**
-     * Initializes the driver.
-     *
-     * Must be called before any of the other methods is called.
-     */
-    virtual void init() = 0;
+    void processJoystickEventButtonDown();
+    void processJoystickEventButtonUp();
 
-    virtual void start(JoystickToMIDIMapper *joystickToMIDIMapper) = 0;
-
-    virtual void stop() = 0;
+private:
+    MIDIInterface *m_midiInterface;
 };
 
 #endif
