@@ -1,0 +1,5 @@
+# Ignore files created by QT Creator
+CMakeLists.txt.user
+
+# Ignore backup files
+*~
