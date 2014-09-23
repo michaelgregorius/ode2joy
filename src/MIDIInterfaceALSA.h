@@ -27,16 +27,16 @@
 
 class MIDIInterfaceALSA : public MIDIInterface {
 public:
-  MIDIInterfaceALSA();
-  virtual ~MIDIInterfaceALSA();
-  
-  virtual void sendNoteOn();
-  
-  virtual void sendNoteOff();
-  
+    MIDIInterfaceALSA();
+    virtual ~MIDIInterfaceALSA();
+
+    virtual void sendNoteOn();
+
+    virtual void sendNoteOff();
+
 private:
-  snd_seq_t *m_seq_handle;
-  int m_port_id;
+    snd_seq_t *m_seq_handle;
+    int m_port_id;
 };
 
 #endif

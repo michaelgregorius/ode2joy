@@ -23,29 +23,30 @@
 
 #include <string>
 
+/**
+ * @brief Describes a joystick (name, number of axis, etc.)
+ */
 class Joystick
 {
 public:
-  // Public enums
-  enum ButtonState { Up, Down };
-  
-  // Public methods
+    // Public methods
 public:
-  Joystick();
-  virtual ~Joystick();
-  
-  virtual std::string getName() const;
-  
-  virtual unsigned int getNumberOfAxis() const = 0;
-  
-  virtual unsigned int getNumberOfButtons() const = 0;
-  
-  // Temporary methods for testing and quick results
-  virtual void processEvents() = 0;
-  
-  virtual void printEvents() const;
-  
-  virtual ButtonState getButtonState() const = 0;
+    Joystick(size_t id, std::string const & name, unsigned int numberOfAxis, unsigned int numberOfButtons);
+    ~Joystick();
+
+    std::string getName() const;
+
+    unsigned int getNumberOfAxis() const;
+
+    unsigned int getNumberOfButtons() const;
+
+private:
+    size_t m_id;
+
+    std::string m_name;
+
+    unsigned int m_numberOfAxis;
+    unsigned int m_numberOfButtons;
 };
 
 #endif

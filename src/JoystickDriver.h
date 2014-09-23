@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Michael Gregorius
+ * Copyright (C) 2014 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -18,38 +18,32 @@
  */
 
 
-#ifndef JOYSTICKLINUX_H
-#define JOYSTICKLINUX_H
+#ifndef JOYSTICKDRIVER_H
+#define JOYSTICKDRIVER_H
 
-#include "Joystick.h"
 
-class JoystickLinux : public Joystick
+#include <string>
+
+class Joystick;
+
+class JoystickDriver
 {
 public:
-  JoystickLinux(std::string deviceFile);
-  virtual ~JoystickLinux();
-  
-  virtual std::string getName() const;
-  
-  virtual unsigned int getNumberOfAxis() const;
-  
-  virtual unsigned int getNumberOfButtons() const;
-  
-  virtual void processEvents();
-  
-  virtual void printEvents() const;
-  
-  virtual ButtonState getButtonState() const;
-  
-  // Private members
-private:
-  int m_joy_fd;
-  std::string m_name;
-  unsigned int m_numberOfButtons;
-  unsigned int m_numberOfAxis;
-  
-  // Temporary, delete
-  ButtonState m_buttonState;
+    JoystickDriver();
+    virtual ~JoystickDriver();
+
+    virtual Joystick getJoystick() const = 0;
+
+    /**
+     * Initializes the driver.
+     *
+     * Must be called before any of the other methods is called.
+     */
+    virtual void init() = 0;
+
+    virtual void start() = 0;
+
+    virtual void stop() = 0;
 };
 
 #endif

@@ -18,31 +18,38 @@
  */
 
 
-#include "Joystick.h"
+#ifndef JOYSTICKDRIVERLINUX_H
+#define JOYSTICKDRIVERLINUX_H
 
-Joystick::Joystick(size_t id, std::string const & name, unsigned int numberOfAxis, unsigned int numberOfButtons) :
-    m_id(id),
-    m_name(name),
-    m_numberOfAxis(numberOfAxis),
-    m_numberOfButtons(numberOfButtons)
-{
-}
+#include "JoystickDriver.h"
 
-Joystick::~Joystick()
-{
-}
 
-std::string Joystick::getName() const
+class JoystickDriverLinux : public JoystickDriver
 {
-    return m_name;
-}
+public:
+    JoystickDriverLinux();
+    virtual ~JoystickDriverLinux();
 
-unsigned int Joystick::getNumberOfAxis() const
-{
-    return m_numberOfAxis;
-}
+    virtual Joystick getJoystick() const;
 
-unsigned int Joystick::getNumberOfButtons() const
-{
-    return m_numberOfButtons;
-}
+    /**
+     * Initializes the driver.
+     *
+     * Must be called before any of the other methods is called.
+     */
+    virtual void init();
+
+    virtual void start();
+
+    virtual void stop();
+
+    // Private members
+private:
+    int m_joy_fd; // File descriptor of the joystick
+
+    std::string m_name;
+    unsigned int m_numberOfButtons;
+    unsigned int m_numberOfAxis;
+};
+
+#endif

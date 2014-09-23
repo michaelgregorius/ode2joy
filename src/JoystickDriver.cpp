@@ -17,32 +17,12 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "JoystickDriver.h"
 
-#include "Joystick.h"
-
-Joystick::Joystick(size_t id, std::string const & name, unsigned int numberOfAxis, unsigned int numberOfButtons) :
-    m_id(id),
-    m_name(name),
-    m_numberOfAxis(numberOfAxis),
-    m_numberOfButtons(numberOfButtons)
+JoystickDriver::JoystickDriver()
 {
 }
 
-Joystick::~Joystick()
+JoystickDriver::~JoystickDriver()
 {
-}
-
-std::string Joystick::getName() const
-{
-    return m_name;
-}
-
-unsigned int Joystick::getNumberOfAxis() const
-{
-    return m_numberOfAxis;
-}
-
-unsigned int Joystick::getNumberOfButtons() const
-{
-    return m_numberOfButtons;
 }

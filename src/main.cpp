@@ -17,60 +17,42 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "JoystickDriver.h"
+#include "Joystick.h"
+#include "Drivers/Joystick/JoystickDriverLinux.h"
+#include "MIDIInterfaceALSA.h"
 
 #include <iostream>
-
-#include "JoystickLinux.h"
-#include "MIDIInterfaceALSA.h"
+#include <chrono>
+#include <thread>
 
 int main (int argc, char **argv)
 {
-  // Create a joystick
-  Joystick *joystick = new JoystickLinux("/dev/input/js0");
+    // Create a joystick
+    JoystickDriver *joystickDriver = new JoystickDriverLinux();
 
-  std::cout << "Joystick name: " << joystick->getName() << std::endl;
-  std::cout << "Number of axis: " << joystick->getNumberOfAxis() << std::endl;
-  std::cout << "Number of buttons: " << joystick->getNumberOfButtons() << std::endl;
-  
-  // Create MIDI interface
-  MIDIInterface *midiInterface = new MIDIInterfaceALSA();
+    joystickDriver->init();
 
-  bool lastSendUp = true;
-  
-  while(true) { // Remove for single shot
-    joystick->processEvents();
+    // Now we can fetch the joystick data
+    Joystick joystick = joystickDriver->getJoystick();
+    std::cout << "Joystick name: " << joystick.getName() << std::endl;
+    std::cout << "Number of axis: " << joystick.getNumberOfAxis() << std::endl;
+    std::cout << "Number of buttons: " << joystick.getNumberOfButtons() << std::endl;
 
-    Joystick::ButtonState state = joystick->getButtonState();
-    switch (state)
-    {
-      case Joystick::Down:
-        {
-          if (lastSendUp)
-          {
-            std::cout << "Sending note on..." << std::endl;
-            midiInterface->sendNoteOn();
-            lastSendUp = false;
-          }
-        }
-        break;
-      case Joystick::Up:
-        {
-          if (!lastSendUp)
-          {
-            std::cout << "Sending a note off..." << std::endl;
-            midiInterface->sendNoteOff();
-            lastSendUp = true;
-          }
-        }
-        break;
-    }
-    
-    //std::cout << "Going to sleep..." << std::endl;
-    //usleep(1000000);
-  }
-  
-  delete joystick;
-  delete midiInterface;
-  
-  return 0;
+    joystickDriver->start();
+
+    std::cout << "Sleeping..." << std::endl;
+    std::chrono::milliseconds duration(10000);
+    std::this_thread::sleep_for(duration);
+    std::cout << "Sleeping ended" << std::endl;
+
+    joystickDriver->stop();
+
+    // Create MIDI interface
+    MIDIInterface *midiInterface = new MIDIInterfaceALSA();
+
+    delete joystickDriver;
+    delete midiInterface;
+
+    return 0;
 }
