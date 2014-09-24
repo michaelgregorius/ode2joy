@@ -17,15 +17,20 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "GUI/MainWindow.h"
+
 #include "JoystickDriver.h"
 #include "Joystick.h"
 #include "Drivers/Joystick/JoystickDriverLinux.h"
 #include "MIDIInterfaceALSA.h"
 #include "JoystickToMIDIMapper.h"
 
+#include <QApplication>
+
 #include <iostream>
 #include <chrono>
 #include <thread>
+
 
 int main (int argc, char **argv)
 {
@@ -46,20 +51,18 @@ int main (int argc, char **argv)
     JoystickToMIDIMapper mapper;
     mapper.setMIDIInterface(midiInterface);
 
-    joystickDriver->start(&mapper);
+    QApplication app(argc, argv);
 
-    while (true)
-    {
-        std::cout << "Sleeping..." << std::endl;
-        std::chrono::milliseconds duration(10000);
-        std::this_thread::sleep_for(duration);
-        std::cout << "Sleeping ended" << std::endl;
-    }
+    MainWindow mainWindow(0, joystickDriver, &mapper);
+    mainWindow.resize(800, 600);
+    mainWindow.show();
 
-    joystickDriver->stop();
+    // For now save the return code so that we can delete the driver
+    // and the interface
+    int result = app.exec();
 
     delete joystickDriver;
     delete midiInterface;
 
-    return 0;
+    return result;
 }
