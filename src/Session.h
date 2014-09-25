@@ -24,7 +24,7 @@
 #include "JoystickToMIDIMapper.h"
 
 class JoystickDriver;
-class MIDIInterface;
+class MIDIDriver;
 
 /**
  * @brief Describes a session (joystick driver, MIDI driver and mappings).
@@ -46,19 +46,19 @@ public:
     void setJoystickDriver(JoystickDriver *joystickDriver);
 
     /**
-     * @brief setMIDIInterface Sets the MIDI driver to use.
-     * @param midiInterface The MIDIInterface to use.
+     * @brief setMIDIDriver Sets the MIDI driver to use.
+     * @param midiDriver The MIDIDriver to use.
      *
      * Takes ownership of the driver. When called with another driver already
      * in use the running driver will be stopped and deleted.
      */
-    void setMIDIInterface(MIDIInterface *midiInterface);
+    void setMIDIDriver(MIDIDriver *midiDriver);
 
 private:
     JoystickToMIDIMapper m_mapper;
 
     JoystickDriver *m_joystickDriver;
-    MIDIInterface *m_midiInterface;
+    MIDIDriver *m_midiDriver;
 };
 
 #endif

@@ -18,25 +18,16 @@
  */
 
 
-#ifndef MIDIINTERFACEALSA_H
-#define MIDIINTERFACEALSA_H
+#ifndef MIDIDRIVER_H
+#define MIDIDRIVER_H
 
-#include "MIDIInterface.h"
-
-#include <alsa/asoundlib.h>
-
-class MIDIInterfaceALSA : public MIDIInterface {
+class MIDIDriver {
 public:
-    MIDIInterfaceALSA();
-    virtual ~MIDIInterfaceALSA();
+    MIDIDriver() {};
+    virtual ~MIDIDriver() {};
 
-    virtual void sendNoteOn();
-
-    virtual void sendNoteOff();
-
-private:
-    snd_seq_t *m_seq_handle;
-    int m_port_id;
+    virtual void sendNoteOn() = 0;
+    virtual void sendNoteOff() = 0;
 };
 
 #endif

@@ -21,11 +21,11 @@
 #include "Session.h"
 
 #include "JoystickDriver.h"
-#include "MIDIInterface.h"
+#include "MIDIDriver.h"
 
 Session::Session() :
     m_joystickDriver(0),
-    m_midiInterface(0)
+    m_midiDriver(0)
 {
     // TODO Load previous drivers/session?
 }
@@ -40,10 +40,10 @@ Session::~Session()
         m_joystickDriver = 0;
     }
 
-    if (m_midiInterface)
+    if (m_midiDriver)
     {
-        delete m_midiInterface;
-        m_midiInterface = 0;
+        delete m_midiDriver;
+        m_midiDriver = 0;
     }
 }
 
@@ -65,14 +65,14 @@ void Session::setJoystickDriver(JoystickDriver *joystickDriver)
     }
 }
 
-void Session::setMIDIInterface(MIDIInterface *midiInterface)
+void Session::setMIDIDriver(MIDIDriver *midiDriver)
 {
-    if (m_midiInterface)
+    if (m_midiDriver)
     {
-        delete m_midiInterface;
+        delete m_midiDriver;
     }
 
-    m_midiInterface = midiInterface;
+    m_midiDriver = midiDriver;
 
-    m_mapper.setMIDIInterface(m_midiInterface);
+    m_mapper.setMIDIDriver(m_midiDriver);
 }

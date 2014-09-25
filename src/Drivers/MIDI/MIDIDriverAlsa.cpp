@@ -18,7 +18,7 @@
  */
 
 
-#include "MIDIInterfaceALSA.h"
+#include "Drivers/MIDI/MIDIDriverAlsa.h"
 
 #include <exception>
 
@@ -45,7 +45,7 @@ void printEvent(snd_seq_event_t *ev)
     }
 }
 
-MIDIInterfaceALSA::MIDIInterfaceALSA() : MIDIInterface()
+MIDIDriverALSA::MIDIDriverALSA() : MIDIDriver()
 {
     // Create the sequencer
     if (snd_seq_open(&m_seq_handle, "hw", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
@@ -61,12 +61,12 @@ MIDIInterfaceALSA::MIDIInterfaceALSA() : MIDIInterface()
     }
 }
 
-MIDIInterfaceALSA::~MIDIInterfaceALSA()
+MIDIDriverALSA::~MIDIDriverALSA()
 {
     snd_seq_close(m_seq_handle);
 }
 
-void MIDIInterfaceALSA::sendNoteOn()
+void MIDIDriverALSA::sendNoteOn()
 {
     snd_seq_event_t ev;
     snd_seq_ev_clear(&ev);
@@ -86,7 +86,7 @@ void MIDIInterfaceALSA::sendNoteOn()
     snd_seq_event_output_direct(m_seq_handle, &ev);
 }
 
-void MIDIInterfaceALSA::sendNoteOff()
+void MIDIDriverALSA::sendNoteOff()
 {
     snd_seq_event_t ev;
     snd_seq_ev_clear(&ev);

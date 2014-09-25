@@ -19,10 +19,10 @@
 
 
 #include "JoystickToMIDIMapper.h"
-#include "MIDIInterface.h"
+#include "MIDIDriver.h"
 
 JoystickToMIDIMapper::JoystickToMIDIMapper() :
-    m_midiInterface(0)
+    m_midiDriver(0)
 {
 }
 
@@ -30,23 +30,23 @@ JoystickToMIDIMapper::~JoystickToMIDIMapper()
 {
 }
 
-void JoystickToMIDIMapper::setMIDIInterface(MIDIInterface *midiInterface)
+void JoystickToMIDIMapper::setMIDIDriver(MIDIDriver *midiDriver)
 {
-    m_midiInterface = midiInterface;
+    m_midiDriver = midiDriver;
 }
 
 void JoystickToMIDIMapper::processJoystickEventButtonDown()
 {
-    if (m_midiInterface)
+    if (m_midiDriver)
     {
-        m_midiInterface->sendNoteOn();
+        m_midiDriver->sendNoteOn();
     }
 }
 
 void JoystickToMIDIMapper::processJoystickEventButtonUp()
 {
-    if (m_midiInterface)
+    if (m_midiDriver)
     {
-        m_midiInterface->sendNoteOff();
+        m_midiDriver->sendNoteOff();
     }
 }

@@ -33,20 +33,21 @@ if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 set (ODE2JOY_SRCS
+  Drivers/Joystick/JoystickDriverLinux.cpp
+  Drivers/MIDI/MIDIDriverAlsa.cpp
   main.cpp
   JoystickDriver.cpp
-  Drivers/Joystick/JoystickDriverLinux.cpp
   Joystick.cpp
   JoystickToMIDIMapper.cpp
-  MIDIInterfaceALSA.cpp
   Session.cpp
 )
 
 set (ODE2JOY_HEADERS
-  JoystickDriver.h
-  MIDIInterface.h
-  JoystickToMIDIMapper.h
   Drivers/Joystick/JoystickDriverLinux.h
+  Drivers/MIDI/MIDIDriverAlsa.h
+  JoystickDriver.h
+  MIDIDriver.h
+  JoystickToMIDIMapper.h
   Session.h
 )
 

@@ -22,7 +22,7 @@
 #define JOYSTICKTOMIDIMAPPER_H
 
 
-class MIDIInterface;
+class MIDIDriver;
 
 
 /**
@@ -34,13 +34,13 @@ public:
     JoystickToMIDIMapper();
     ~JoystickToMIDIMapper();
 
-    void setMIDIInterface(MIDIInterface *midiInterface);
+    void setMIDIDriver(MIDIDriver *midiDriver);
 
     void processJoystickEventButtonDown();
     void processJoystickEventButtonUp();
 
 private:
-    MIDIInterface *m_midiInterface;
+    MIDIDriver *m_midiDriver;
 };
 
 #endif

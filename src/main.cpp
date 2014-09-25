@@ -29,7 +29,5 @@ int main (int argc, char **argv)
     MainWindow mainWindow(0);
     mainWindow.show();
 
-    // For now save the return code so that we can delete the driver
-    // and the interface
     return app.exec();
 }

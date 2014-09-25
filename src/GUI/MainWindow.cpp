@@ -23,7 +23,7 @@
 
 // TODO Fetch from factories when selected in the GUI
 #include "Drivers/Joystick/JoystickDriverLinux.h"
-#include "MIDIInterfaceALSA.h"
+#include "Drivers/MIDI/MIDIDriverAlsa.h"
 
 #include <QMenuBar>
 #include <QMenu>
@@ -83,13 +83,13 @@ void MainWindow::onActionNewSession()
 
     m_session = new Session();
 
-    // Create a joystick
+    // Create a joystick driver
     JoystickDriver *joystickDriver = new JoystickDriverLinux();
     m_session->setJoystickDriver(joystickDriver);
 
-    // Create MIDI interface
-    MIDIInterface *midiInterface = new MIDIInterfaceALSA();
-    m_session->setMIDIInterface(midiInterface);
+    // Create MIDI driver
+    MIDIDriver *midiDriver = new MIDIDriverALSA();
+    m_session->setMIDIDriver(midiDriver);
 }
 
 void MainWindow::onActionQuit()
