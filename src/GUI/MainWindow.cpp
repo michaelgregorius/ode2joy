@@ -19,19 +19,20 @@
 
 #include "MainWindow.h"
 
-#include "JoystickDriver.h"
+#include "Session.h"
+
+// TODO Fetch from factories when selected in the GUI
+#include "Drivers/Joystick/JoystickDriverLinux.h"
+#include "MIDIInterfaceALSA.h"
 
 #include <QMenuBar>
 #include <QMenu>
 #include <QGraphicsPathItem>
 #include <QMessageBox>
 
-MainWindow::MainWindow(QWidget *parent,
-                       JoystickDriver *joystickDriver,
-                       JoystickToMIDIMapper *joystickToMIDIMapper) :
+MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    m_joystickDriver(joystickDriver),
-    m_joystickToMIDIMapper(joystickToMIDIMapper)
+    m_session(0)
 {
     this->setWindowTitle("ode2joy");
     this->setWindowIcon(QIcon(":/images/application-icon.png"));
@@ -40,11 +41,15 @@ MainWindow::MainWindow(QWidget *parent,
     QMenuBar *mainWindowMenuBar = this->menuBar();
     QMenu *fileMenu = new QMenu(QMenu::tr("&File"), mainWindowMenuBar);
 
+    QAction *newSessionAction = fileMenu->addAction(QMenu::tr("&New session"));
+    newSessionAction->setShortcuts(QKeySequence::New);
+    QObject::connect(newSessionAction, SIGNAL(triggered()), SLOT(onActionNewSession()));
+
     QAction *quitAction = fileMenu->addAction(QMenu::tr("&Quit"));
     quitAction->setShortcuts(QKeySequence::Quit);
-    mainWindowMenuBar->addMenu(fileMenu);
-
     QObject::connect(quitAction, SIGNAL(triggered()), SLOT(onActionQuit()));
+
+    mainWindowMenuBar->addMenu(fileMenu);
 
     // Help menu
     QMenu *helpMenu = new QMenu(QMenu::tr("&Help"), mainWindowMenuBar);
@@ -53,21 +58,38 @@ MainWindow::MainWindow(QWidget *parent,
     mainWindowMenuBar->addMenu(helpMenu);
 
     QObject::connect(aboutQtAction, SIGNAL(triggered()), SLOT(onActionAboutQt()));
-
-    if (m_joystickDriver)
-    {
-        m_joystickDriver->start(m_joystickToMIDIMapper);
-    }
 }
 
 MainWindow::~MainWindow()
 {
+    if (m_session)
+    {
+        delete m_session;
+        m_session = 0;
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    stopJoystickDriver();
     QMainWindow::closeEvent(event);
+}
+
+void MainWindow::onActionNewSession()
+{
+    if (m_session)
+    {
+        delete m_session;
+    }
+
+    m_session = new Session();
+
+    // Create a joystick
+    JoystickDriver *joystickDriver = new JoystickDriverLinux();
+    m_session->setJoystickDriver(joystickDriver);
+
+    // Create MIDI interface
+    MIDIInterface *midiInterface = new MIDIInterfaceALSA();
+    m_session->setMIDIInterface(midiInterface);
 }
 
 void MainWindow::onActionQuit()
@@ -78,12 +100,4 @@ void MainWindow::onActionQuit()
 void MainWindow::onActionAboutQt()
 {
     QMessageBox::aboutQt(this);
-}
-
-void MainWindow::stopJoystickDriver() const
-{
-    if (m_joystickDriver)
-    {
-        m_joystickDriver->stop();
-    }
 }

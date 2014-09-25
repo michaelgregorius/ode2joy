@@ -23,30 +23,26 @@
 #include <QMainWindow>
 
 
-class JoystickDriver;
-class JoystickToMIDIMapper;
+class Session;
 
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent, JoystickDriver *joystickDriver, JoystickToMIDIMapper *joystickToMIDIMapper);
+    MainWindow(QWidget *parent);
     virtual ~MainWindow();
 
 protected:
     void closeEvent(QCloseEvent *event);
 
 private slots:
+    void onActionNewSession();
     void onActionQuit();
     void onActionAboutQt();
 
 private:
-    void stopJoystickDriver() const;
-
-private:
-    JoystickDriver *m_joystickDriver;
-    JoystickToMIDIMapper *m_joystickToMIDIMapper;
+    Session *m_session;
 };
 
 #endif /* MAINWINDOW_H_ */

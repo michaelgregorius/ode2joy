@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Michael Gregorius
+ * Copyright (C) 2014 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -19,50 +19,17 @@
 
 #include "GUI/MainWindow.h"
 
-#include "JoystickDriver.h"
-#include "Joystick.h"
-#include "Drivers/Joystick/JoystickDriverLinux.h"
-#include "MIDIInterfaceALSA.h"
-#include "JoystickToMIDIMapper.h"
-
 #include <QApplication>
-
-#include <iostream>
-#include <chrono>
-#include <thread>
 
 
 int main (int argc, char **argv)
 {
-    // Create a joystick
-    JoystickDriver *joystickDriver = new JoystickDriverLinux();
-
-    joystickDriver->init();
-
-    // Now we can fetch the joystick data
-    Joystick joystick = joystickDriver->getJoystick();
-    std::cout << "Joystick name: " << joystick.getName() << std::endl;
-    std::cout << "Number of axis: " << joystick.getNumberOfAxis() << std::endl;
-    std::cout << "Number of buttons: " << joystick.getNumberOfButtons() << std::endl;
-
-    // Create MIDI interface
-    MIDIInterface *midiInterface = new MIDIInterfaceALSA();
-
-    JoystickToMIDIMapper mapper;
-    mapper.setMIDIInterface(midiInterface);
-
     QApplication app(argc, argv);
 
-    MainWindow mainWindow(0, joystickDriver, &mapper);
-    mainWindow.resize(800, 600);
+    MainWindow mainWindow(0);
     mainWindow.show();
 
     // For now save the return code so that we can delete the driver
     // and the interface
-    int result = app.exec();
-
-    delete joystickDriver;
-    delete midiInterface;
-
-    return result;
+    return app.exec();
 }

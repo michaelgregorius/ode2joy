@@ -39,6 +39,7 @@ set (ODE2JOY_SRCS
   Joystick.cpp
   JoystickToMIDIMapper.cpp
   MIDIInterfaceALSA.cpp
+  Session.cpp
 )
 
 set (ODE2JOY_HEADERS
@@ -46,6 +47,7 @@ set (ODE2JOY_HEADERS
   MIDIInterface.h
   JoystickToMIDIMapper.h
   Drivers/Joystick/JoystickDriverLinux.h
+  Session.h
 )
 
 # Define GUI classes
