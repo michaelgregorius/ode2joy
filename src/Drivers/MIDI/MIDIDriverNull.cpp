@@ -17,34 +17,23 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MAINWINDOW_H_
-#define MAINWINDOW_H_
 
-#include <QMainWindow>
+#include "Drivers/MIDI/MIDIDriverNull.h"
 
 
-class Session;
-
-class MainWindow : public QMainWindow
+MIDIDriverNull::MIDIDriverNull() :
+    MIDIDriver()
 {
-    Q_OBJECT
+}
 
-public:
-    MainWindow(QWidget *parent);
-    virtual ~MainWindow();
+MIDIDriverNull::~MIDIDriverNull()
+{
+}
 
-protected:
-    void closeEvent(QCloseEvent *event);
+void MIDIDriverNull::sendNoteOn()
+{
+}
 
-private slots:
-    void onActionNewSession();
-    void onActionQuit();
-    void onActionJoystickDriverSelected();
-    void onActionMIDIDriverSelected();
-    void onActionAboutQt();
-
-private:
-    Session *m_session;
-};
-
-#endif /* MAINWINDOW_H_ */
+void MIDIDriverNull::sendNoteOff()
+{
+}

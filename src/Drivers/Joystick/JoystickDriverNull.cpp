@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Michael Gregorius
+ * Copyright (C) 2011 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -17,34 +17,33 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MAINWINDOW_H_
-#define MAINWINDOW_H_
 
-#include <QMainWindow>
+// Corresponding include file
+#include "JoystickDriverNull.h"
 
 
-class Session;
-
-class MainWindow : public QMainWindow
+JoystickDriverNull::JoystickDriverNull()
 {
-    Q_OBJECT
+}
 
-public:
-    MainWindow(QWidget *parent);
-    virtual ~MainWindow();
+JoystickDriverNull::~JoystickDriverNull()
+{
+}
 
-protected:
-    void closeEvent(QCloseEvent *event);
+JoystickDriver::JoystickCollection JoystickDriverNull::getJoysticks() const
+{
+    return JoystickCollection();
+}
 
-private slots:
-    void onActionNewSession();
-    void onActionQuit();
-    void onActionJoystickDriverSelected();
-    void onActionMIDIDriverSelected();
-    void onActionAboutQt();
+void JoystickDriverNull::init()
+{
+    // All done in the constructor
+}
 
-private:
-    Session *m_session;
-};
+void JoystickDriverNull::start(JoystickToMIDIMapper *joystickToMIDIMapper)
+{
+}
 
-#endif /* MAINWINDOW_H_ */
+void JoystickDriverNull::stop()
+{
+}

@@ -30,7 +30,7 @@ public:
     JoystickDriverLinux();
     virtual ~JoystickDriverLinux();
 
-    virtual Joystick getJoystick() const;
+    virtual JoystickCollection getJoysticks() const;
 
     /**
      * Initializes the driver.
@@ -50,6 +50,8 @@ private:
     std::string m_name;
     unsigned int m_numberOfButtons;
     unsigned int m_numberOfAxis;
+
+    bool m_initialized;
 };
 
 #endif

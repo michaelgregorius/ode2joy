@@ -21,14 +21,15 @@
 
 #include "Session.h"
 
-// TODO Fetch from factories when selected in the GUI
-#include "Drivers/Joystick/JoystickDriverLinux.h"
-#include "Drivers/MIDI/MIDIDriverAlsa.h"
+#include "Drivers/Joystick/JoystickDriverFactory.h"
+#include "Drivers/MIDI/MIDIDriverFactory.h"
 
 #include <QMenuBar>
 #include <QMenu>
 #include <QGraphicsPathItem>
 #include <QMessageBox>
+
+#include <iostream>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -50,6 +51,37 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(quitAction, SIGNAL(triggered()), SLOT(onActionQuit()));
 
     mainWindowMenuBar->addMenu(fileMenu);
+
+    // Drivers menu
+    QMenu *driverMenu = new QMenu(QMenu::tr("&Driver"), mainWindowMenuBar);
+
+    // Joystick sub menu
+    QMenu *joystickDriverMenu = new QMenu(QMenu::tr("&Joystick"), driverMenu);
+    driverMenu->addMenu(joystickDriverMenu);
+    JoystickDriverFactory const *factory = JoystickDriverFactory::getInstance();
+    JoystickDriverFactory::DriverDescriptionCollection descriptions = factory->getDriverDescriptions();
+
+    for (auto d : descriptions)
+    {
+        QAction *joysticDriverAction = joystickDriverMenu->addAction(QString::fromStdString(d.getDescription()));
+        joysticDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
+        QObject::connect(joysticDriverAction, SIGNAL(triggered()), SLOT(onActionJoystickDriverSelected()));
+    }
+
+    // MIDI sub menu
+    QMenu *midiDriverMenu = new QMenu(QMenu::tr("&MIDI"), driverMenu);
+    driverMenu->addMenu(midiDriverMenu);
+    MIDIDriverFactory const *midiFactory = MIDIDriverFactory::getInstance();
+    MIDIDriverFactory::DriverDescriptionCollection midiDescriptions = midiFactory->getDriverDescriptions();
+
+    for (auto d : midiDescriptions)
+    {
+        QAction *midiDriverAction = midiDriverMenu->addAction(QString::fromStdString(d.getDescription()));
+        midiDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
+        QObject::connect(midiDriverAction, SIGNAL(triggered()), SLOT(onActionMIDIDriverSelected()));
+    }
+
+    mainWindowMenuBar->addMenu(driverMenu);
 
     // Help menu
     QMenu *helpMenu = new QMenu(QMenu::tr("&Help"), mainWindowMenuBar);
@@ -82,19 +114,57 @@ void MainWindow::onActionNewSession()
     }
 
     m_session = new Session();
-
-    // Create a joystick driver
-    JoystickDriver *joystickDriver = new JoystickDriverLinux();
-    m_session->setJoystickDriver(joystickDriver);
-
-    // Create MIDI driver
-    MIDIDriver *midiDriver = new MIDIDriverALSA();
-    m_session->setMIDIDriver(midiDriver);
 }
 
 void MainWindow::onActionQuit()
 {
     this->close();
+}
+
+void MainWindow::onActionJoystickDriverSelected()
+{
+    if (!m_session)
+    {
+        QMessageBox::information(this,
+                                 tr("No session started"),
+                                 tr("Please start a session before selecting a joystick driver!"));
+
+        return;
+    }
+
+    QObject *s = sender();
+
+    QAction *action = dynamic_cast<QAction*>(s);
+    if (action)
+    {
+        std::string key = action->data().toString().toStdString();
+
+        JoystickDriver *driver = JoystickDriverFactory::getInstance()->createDriver(key);
+        m_session->setJoystickDriver(driver);
+    }
+}
+
+void MainWindow::onActionMIDIDriverSelected()
+{
+    if (!m_session)
+    {
+        QMessageBox::information(this,
+                                 tr("No session started"),
+                                 tr("Please start a session before selecting a MIDI driver!"));
+
+        return;
+    }
+
+    QObject *s = sender();
+
+    QAction *action = dynamic_cast<QAction*>(s);
+    if (action)
+    {
+        std::string key = action->data().toString().toStdString();
+
+        MIDIDriver *driver = MIDIDriverFactory::getInstance()->createDriver(key);
+        m_session->setMIDIDriver(driver);
+    }
 }
 
 void MainWindow::onActionAboutQt()

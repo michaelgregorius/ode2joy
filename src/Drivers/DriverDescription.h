@@ -18,25 +18,32 @@
  */
 
 
-#ifndef MIDIDRIVERALSA_H
-#define MIDIDRIVERALSA_H
+#ifndef DRIVERDESCRIPTION_H
+#define DRIVERDESCRIPTION_H
 
-#include "MIDIDriver.h"
+#include <string>
 
-#include <alsa/asoundlib.h>
 
-class MIDIDriverALSA : public MIDIDriver {
+/**
+ * @brief Description for drivers.
+ */
+class DriverDescription
+{
 public:
-    MIDIDriverALSA();
-    virtual ~MIDIDriverALSA();
+    DriverDescription(std::string const & key, std::string const & description) :
+        m_key(key),
+        m_description(description)
+    {
+    }
 
-    virtual void sendNoteOn();
+    ~DriverDescription() {}
 
-    virtual void sendNoteOff();
+    std::string const & getKey() const { return m_key; }
+    std::string const & getDescription() const { return m_description; }
 
 private:
-    snd_seq_t *m_seq_handle;
-    int m_port_id;
+    std::string m_key;
+    std::string m_description;
 };
 
 #endif

@@ -21,19 +21,28 @@
 #ifndef JOYSTICKDRIVER_H
 #define JOYSTICKDRIVER_H
 
+#include "Joystick.h"
 
 #include <string>
+#include <vector>
 
-class Joystick;
 class JoystickToMIDIMapper;
 
 class JoystickDriver
 {
+    // Public typedef, statics, etc.
+public:
+    typedef std::vector<Joystick> JoystickCollection;
+
 public:
     JoystickDriver();
     virtual ~JoystickDriver();
 
-    virtual Joystick getJoystick() const = 0;
+    /**
+     * @brief Returns the joysticks provided by the driver.
+     * @return The joysticks provided by the driver.
+     */
+    virtual JoystickCollection getJoysticks() const = 0;
 
     /**
      * Initializes the driver.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Michael Gregorius
+ * Copyright (C) 2014 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -18,7 +18,7 @@
  */
 
 
-#include "Drivers/MIDI/MIDIDriverAlsa.h"
+#include "Drivers/MIDI/MIDIDriverALSA.h"
 
 #include <exception>
 

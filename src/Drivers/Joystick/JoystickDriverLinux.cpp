@@ -101,6 +101,7 @@ void process_in_thread(int joy_fd, JoystickToMIDIMapper *joystickToMIDIMapper)
         // more events to read. We have to check for real errors using errno.
         if (errno != EAGAIN)
         {
+            // TODO Is executed when the joystick is pulled out. Handle correctly!
             throw std::exception();
         }
 
@@ -112,11 +113,13 @@ void process_in_thread(int joy_fd, JoystickToMIDIMapper *joystickToMIDIMapper)
 
 std::thread processThread;
 
-JoystickDriverLinux::JoystickDriverLinux()
+JoystickDriverLinux::JoystickDriverLinux() :
+    m_joy_fd(0),
+    m_initialized(false)
 {
     if ((m_joy_fd = open("/dev/input/js0", O_RDONLY)) < 0)
     {
-        throw std::exception();
+        return; // This will keep the driver uninitialized and reporting 0 joysticks
     }
 
     // Set to non-blocking reads
@@ -133,6 +136,8 @@ JoystickDriverLinux::JoystickDriverLinux()
 
     m_numberOfAxis = (unsigned int) axis;
     m_numberOfButtons = (unsigned int) buttons;
+
+    m_initialized = true;
 }
 
 JoystickDriverLinux::~JoystickDriverLinux()
@@ -140,9 +145,14 @@ JoystickDriverLinux::~JoystickDriverLinux()
     close(m_joy_fd);
 }
 
-Joystick JoystickDriverLinux::getJoystick() const
+JoystickDriver::JoystickCollection JoystickDriverLinux::getJoysticks() const
 {
-    return Joystick(m_joy_fd, m_name, m_numberOfAxis, m_numberOfButtons);
+    if (!m_initialized)
+    {
+        return JoystickCollection();
+    }
+    JoystickCollection joysticks = { Joystick(m_joy_fd, m_name, m_numberOfAxis, m_numberOfButtons) };
+    return joysticks;
 }
 
 void JoystickDriverLinux::init()
@@ -152,6 +162,11 @@ void JoystickDriverLinux::init()
 
 void JoystickDriverLinux::start(JoystickToMIDIMapper *joystickToMIDIMapper)
 {
+    if (!m_initialized)
+    {
+        return;
+    }
+
     started = true;
 
     processThread = std::thread(process_in_thread, m_joy_fd, joystickToMIDIMapper);
@@ -159,6 +174,11 @@ void JoystickDriverLinux::start(JoystickToMIDIMapper *joystickToMIDIMapper)
 
 void JoystickDriverLinux::stop()
 {
+    if (!m_initialized)
+    {
+        return;
+    }
+
     started = false;
 
     processThread.join();
