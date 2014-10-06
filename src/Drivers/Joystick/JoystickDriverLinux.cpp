@@ -22,6 +22,7 @@
 #include "JoystickDriverLinux.h"
 
 #include "Joystick.h"
+#include "JoystickEvent.h"
 #include "JoystickToMIDIMapper.h"
 
 #include <iostream>
@@ -63,6 +64,11 @@ void printEventInfo(js_event const & event) {
     std::cout << std::endl;
 }
 
+inline float mapToFloat(int value)
+{
+    return (static_cast<float>(value) / 32767);
+}
+
 void process_in_thread(int joy_fd, JoystickToMIDIMapper *joystickToMIDIMapper)
 {
     struct js_event event;
@@ -73,26 +79,23 @@ void process_in_thread(int joy_fd, JoystickToMIDIMapper *joystickToMIDIMapper)
         {
             if (event.type & JS_EVENT_INIT)
             {
+                // TODO Support init events in JoystickEvent?
                 printEventInfo(event);
             }
 
             if (event.type == JS_EVENT_BUTTON)
             {
-                printEventInfo(event);
-                bool buttonDown = (bool) event.value;
-                if (buttonDown)
-                {
-                    joystickToMIDIMapper->processJoystickEventButtonDown();
-                }
-                else
-                {
-                    joystickToMIDIMapper->processJoystickEventButtonUp();
-                }
+                //printEventInfo(event);
+                bool buttonDown = static_cast<bool>(event.value);
+                JoystickEvent::Type eventType = buttonDown ? JoystickEvent::ButtonDown : JoystickEvent::ButtonUp;
+                joystickToMIDIMapper->handleJoystickEvent(JoystickEvent(eventType, event.number, event.value, joy_fd));
             }
 
             if (event.type == JS_EVENT_AXIS)
             {
-                printEventInfo(event);
+                //printEventInfo(event);
+                float value = mapToFloat(event.value);
+                joystickToMIDIMapper->handleJoystickEvent(JoystickEvent(JoystickEvent::Axis, event.number, value, joy_fd));
             }
         }
 

@@ -23,6 +23,7 @@
 
 
 class MIDIDriver;
+class JoystickEvent;
 
 
 /**
@@ -36,8 +37,7 @@ public:
 
     void setMIDIDriver(MIDIDriver *midiDriver);
 
-    void processJoystickEventButtonDown();
-    void processJoystickEventButtonUp();
+    void handleJoystickEvent(JoystickEvent event);
 
 private:
     MIDIDriver *m_midiDriver;

@@ -42,6 +42,7 @@ set (ODE2JOY_SRCS
   main.cpp
   JoystickDriver.cpp
   Joystick.cpp
+  JoystickEvent.cpp
   JoystickToMIDIMapper.cpp
   Session.cpp
 )
@@ -55,6 +56,7 @@ set (ODE2JOY_HEADERS
   Drivers/MIDI/MIDIDriverNull.h
   Drivers/DriverDescription.h
   JoystickDriver.h
+  JoystickEvent.cpp
   MIDIDriver.h
   JoystickToMIDIMapper.h
   Session.h

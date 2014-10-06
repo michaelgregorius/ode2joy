@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Michael Gregorius
+ * Copyright (C) 2014 Michael Gregorius
  *
  * This file is part of ode2joy.
  *
@@ -18,40 +18,43 @@
  */
 
 
-#include "JoystickToMIDIMapper.h"
-
-#include "MIDIDriver.h"
 #include "JoystickEvent.h"
 
-JoystickToMIDIMapper::JoystickToMIDIMapper() :
-    m_midiDriver(0)
+#include <iostream>
+
+JoystickEvent::JoystickEvent(Type type, unsigned int number, float value, size_t id) :
+    m_type(type),
+    m_number(number),
+    m_value(value),
+    m_id(id)
 {
 }
 
-JoystickToMIDIMapper::~JoystickToMIDIMapper()
+JoystickEvent::~JoystickEvent()
 {
 }
 
-void JoystickToMIDIMapper::setMIDIDriver(MIDIDriver *midiDriver)
+void JoystickEvent::print() const
 {
-    m_midiDriver = midiDriver;
-}
-
-void JoystickToMIDIMapper::handleJoystickEvent(JoystickEvent event)
-{
-    event.print();
-    if (event.getType() == JoystickEvent::ButtonDown)
+    std::cout << "Type: ";
+    if (getType() == Axis)
     {
-        if (m_midiDriver)
-        {
-            m_midiDriver->sendNoteOn();
-        }
+        std::cout << "Axis";
     }
-    else if (event.getType() == JoystickEvent::ButtonUp)
+
+    if (getType() == ButtonDown)
     {
-        if (m_midiDriver)
-        {
-            m_midiDriver->sendNoteOff();
-        }
+        std::cout << "Button down";
     }
+
+    if (getType() == ButtonUp)
+    {
+        std::cout << "Button up";
+    }
+
+    std::cout << "\n";
+
+    std::cout << "Number: " << getNumber() << "\n";
+    std::cout << "Value: " << getValue() << "\n";
+    std::cout << std::endl;
 }
