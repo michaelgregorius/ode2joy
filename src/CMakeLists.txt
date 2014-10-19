@@ -39,7 +39,7 @@ set (ODE2JOY_SRCS
   Drivers/MIDI/MIDIDriverALSA.cpp
   Drivers/MIDI/MIDIDriverFactory.cpp
   Drivers/MIDI/MIDIDriverNull.cpp
-  main.cpp
+  MIDI/MIDIEvent.cpp
   JoystickDriver.cpp
   Joystick.cpp
   JoystickEvent.cpp
@@ -55,6 +55,7 @@ set (ODE2JOY_HEADERS
   Drivers/MIDI/MIDIDriverFactory.h
   Drivers/MIDI/MIDIDriverNull.h
   Drivers/DriverDescription.h
+  MIDI/MIDIEvent.h
   JoystickDriver.h
   JoystickEvent.cpp
   MIDIDriver.h
@@ -94,6 +95,7 @@ endif (APPLE)
 
 add_executable(ode2joy
                ${GUI_TYPE}
+               main.cpp
                ${ODE2JOY_SRCS}
                ${ODE2JOY_HEADERS}
                ${QT_GUI_SRCS}
@@ -111,3 +113,26 @@ install (TARGETS ode2joy
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )
+
+# Unit test section
+enable_testing()
+
+add_executable(MIDITest
+               UnitTests/MIDITest.cpp
+               ${ODE2JOY_SRCS}
+)
+
+if (ODE2JOY_LINK_LIBRARIES)
+  target_link_libraries (MIDITest ${ODE2JOY_LINK_LIBRARIES})
+endif (ODE2JOY_LINK_LIBRARIES)
+
+add_test(MIDI-Status MIDITest test_status)
+add_test(MIDI-Channel MIDITest test_channel)
+add_test(MIDI-Note MIDITest test_note)
+add_test(MIDI-Velocity MIDITest test_velocity)
+add_test(MIDI-PolyphonicAftertouch MIDITest test_polyphonic_aftertouch)
+add_test(MIDI-Controller MIDITest test_controller)
+add_test(MIDI-ControllerValue MIDITest test_controller_value)
+add_test(MIDI-ProgramChange MIDITest test_program_change)
+add_test(MIDI-ChannelAftertouch MIDITest test_channel_aftertouch)
+add_test(MIDI-Pitchbend MIDITest test_pitch_bend)
