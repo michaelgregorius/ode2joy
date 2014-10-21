@@ -23,6 +23,8 @@
 #include "MIDIDriver.h"
 #include "JoystickEvent.h"
 
+#include "MIDI/MIDIEvent.h"
+
 JoystickToMIDIMapper::JoystickToMIDIMapper() :
     m_midiDriver(0)
 {
@@ -44,14 +46,24 @@ void JoystickToMIDIMapper::handleJoystickEvent(JoystickEvent event)
     {
         if (m_midiDriver)
         {
-            m_midiDriver->sendNoteOn();
+            MIDIEvent midiEvent;
+            midiEvent.setStatus(MIDIEvent::NoteOn);
+            midiEvent.setChannel(0);
+            midiEvent.setNote(48 - event.getNumber());
+            midiEvent.setVelocity(100);
+            m_midiDriver->processEvent(midiEvent);
         }
     }
     else if (event.getType() == JoystickEvent::ButtonUp)
     {
         if (m_midiDriver)
         {
-            m_midiDriver->sendNoteOff();
+            MIDIEvent midiEvent;
+            midiEvent.setStatus(MIDIEvent::NoteOff);
+            midiEvent.setChannel(0);
+            midiEvent.setNote(48 - event.getNumber());
+            midiEvent.setVelocity(100);
+            m_midiDriver->processEvent(midiEvent);
         }
     }
 }

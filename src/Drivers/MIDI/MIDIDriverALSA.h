@@ -31,9 +31,7 @@ public:
     MIDIDriverALSA();
     virtual ~MIDIDriverALSA();
 
-    virtual void sendNoteOn();
-
-    virtual void sendNoteOff();
+    virtual void processEvent(MIDIEvent const & midiEvent);
 
 private:
     snd_seq_t *m_seq_handle;

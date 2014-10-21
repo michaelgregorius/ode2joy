@@ -30,9 +30,7 @@ public:
     MIDIDriverNull();
     virtual ~MIDIDriverNull();
 
-    virtual void sendNoteOn();
-
-    virtual void sendNoteOff();
+    virtual void processEvent(MIDIEvent const &);
 };
 
 #endif

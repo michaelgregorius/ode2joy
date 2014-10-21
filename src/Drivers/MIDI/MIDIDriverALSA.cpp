@@ -20,6 +20,8 @@
 
 #include "Drivers/MIDI/MIDIDriverALSA.h"
 
+#include "MIDI/MIDIEvent.h"
+
 #include <exception>
 
 void printEvent(snd_seq_event_t *ev)
@@ -66,34 +68,37 @@ MIDIDriverALSA::~MIDIDriverALSA()
     snd_seq_close(m_seq_handle);
 }
 
-void MIDIDriverALSA::sendNoteOn()
+void MIDIDriverALSA::processEvent(MIDIEvent const & midiEvent)
 {
     snd_seq_event_t ev;
     snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_noteon(&ev, 0, 48, 100);
-    //ev.type = SND_SEQ_EVENT_NOTEON;
-    //ev.data.control.channel = 0;
-    //ev.data.note.note = 48;
-    printEvent(&ev);
 
-    // Associate the event with a source port
-    snd_seq_ev_set_source(&ev, m_port_id);
-    // All subscriber of or port should get the event
-    snd_seq_ev_set_subs(&ev);
-    // Event will be sent directly
-    snd_seq_ev_set_direct(&ev);
+    switch(midiEvent.getStatus())
+    {
+    case MIDIEvent::NoteOn:
+        snd_seq_ev_set_noteon(&ev, midiEvent.getChannel(), midiEvent.getNote(), midiEvent.getVelocity());
+        break;
+    case MIDIEvent::NoteOff:
+        snd_seq_ev_set_noteoff(&ev, midiEvent.getChannel(), midiEvent.getNote(), midiEvent.getVelocity());
+        break;
+    case MIDIEvent::PolyphonicAftertouch:
+        snd_seq_ev_set_keypress(&ev, midiEvent.getChannel(), midiEvent.getNote(), midiEvent.getPolyphonicAftertouch());
+        break;
+    case MIDIEvent::ControlChange:
+        snd_seq_ev_set_controller(&ev, midiEvent.getChannel(), midiEvent.getController(), midiEvent.getControllerValue());
+        break;
+    case MIDIEvent::ProgramChange:
+        snd_seq_ev_set_pgmchange(&ev, midiEvent.getChannel(), midiEvent.getProgramChangeInstrument());
+        break;
+    case MIDIEvent::ChannelAftertouch:
+        snd_seq_ev_set_chanpress(&ev, midiEvent.getChannel(), midiEvent.getChannelAftertouch());
+        break;
+    case MIDIEvent::PitchBending:
+        // ALSA uses zero centered pitch bend values so we have to correct the value from the MIDI event
+        snd_seq_ev_set_pitchbend(&ev, midiEvent.getChannel(), static_cast<int>(midiEvent.getPitchBend()) - 8192);
+        break;
+    }
 
-    snd_seq_event_output_direct(m_seq_handle, &ev);
-}
-
-void MIDIDriverALSA::sendNoteOff()
-{
-    snd_seq_event_t ev;
-    snd_seq_ev_clear(&ev);
-    snd_seq_ev_set_noteoff(&ev, 0, 48, 100);
-    //ev.type = SND_SEQ_EVENT_NOTEON;
-    //ev.data.control.channel = 0;
-    //ev.data.note.note = 48;
     printEvent(&ev);
 
     // Associate the event with a source port

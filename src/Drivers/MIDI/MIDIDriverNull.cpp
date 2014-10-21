@@ -30,10 +30,6 @@ MIDIDriverNull::~MIDIDriverNull()
 {
 }
 
-void MIDIDriverNull::sendNoteOn()
-{
-}
-
-void MIDIDriverNull::sendNoteOff()
+void MIDIDriverNull::processEvent(MIDIEvent const &)
 {
 }

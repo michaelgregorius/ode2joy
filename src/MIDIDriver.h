@@ -21,13 +21,14 @@
 #ifndef MIDIDRIVER_H
 #define MIDIDRIVER_H
 
+class MIDIEvent;
+
 class MIDIDriver {
 public:
     MIDIDriver() {};
     virtual ~MIDIDriver() {};
 
-    virtual void sendNoteOn() = 0;
-    virtual void sendNoteOff() = 0;
+    virtual void processEvent(MIDIEvent const & midiEvent) = 0;
 };
 
 #endif
