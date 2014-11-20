@@ -17,36 +17,13 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MAINWINDOW_H_
-#define MAINWINDOW_H_
 
-#include <QMainWindow>
+#include "SessionObserver.h"
 
-
-class Session;
-class SessionWidget;
-
-class MainWindow : public QMainWindow
+SessionObserver::SessionObserver()
 {
-    Q_OBJECT
+}
 
-public:
-    MainWindow(QWidget *parent);
-    virtual ~MainWindow();
-
-protected:
-    void closeEvent(QCloseEvent *event);
-
-private slots:
-    void onActionNewSession();
-    void onActionQuit();
-    void onActionJoystickDriverSelected();
-    void onActionMIDIDriverSelected();
-    void onActionAboutQt();
-
-private:
-    Session *m_session;
-    SessionWidget *m_sessionWidget;
-};
-
-#endif /* MAINWINDOW_H_ */
+SessionObserver::~SessionObserver()
+{
+}

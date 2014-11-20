@@ -19,6 +19,7 @@
 
 
 #include "Session.h"
+#include "SessionObserver.h"
 
 #include "JoystickDriver.h"
 #include "MIDIDriver.h"
@@ -47,6 +48,20 @@ Session::~Session()
     }
 }
 
+void Session::addObserver(SessionObserver* observer)
+{
+    m_sessionObservers.insert(observer);
+}
+
+void Session::removeObserver(SessionObserver* observer)
+{
+    ObserverSet::iterator it = m_sessionObservers.find(observer);
+    if (it != m_sessionObservers.end())
+    {
+        m_sessionObservers.erase(it);
+    }
+}
+
 void Session::setJoystickDriver(JoystickDriver *joystickDriver)
 {
     if (m_joystickDriver)
@@ -62,6 +77,11 @@ void Session::setJoystickDriver(JoystickDriver *joystickDriver)
     {
         m_joystickDriver->init();
         m_joystickDriver->start(&m_mapper);
+
+        for (SessionObserver* o : m_sessionObservers)
+        {
+            o->onJoystickDriverChanged();
+        }
     }
 }
 
@@ -75,4 +95,9 @@ void Session::setMIDIDriver(MIDIDriver *midiDriver)
     m_midiDriver = midiDriver;
 
     m_mapper.setMIDIDriver(m_midiDriver);
+
+    for (SessionObserver* o : m_sessionObservers)
+    {
+        o->onMIDIDriverChanged();
+    }
 }

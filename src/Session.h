@@ -23,8 +23,11 @@
 
 #include "JoystickToMIDIMapper.h"
 
+#include <set>
+
 class JoystickDriver;
 class MIDIDriver;
+class SessionObserver;
 
 /**
  * @brief Describes a session (joystick driver, MIDI driver and mappings).
@@ -34,6 +37,11 @@ class Session
 public:
     Session();
     ~Session();
+
+    void addObserver(SessionObserver* observer);
+    void removeObserver(SessionObserver* observer);
+
+    JoystickDriver * getJoystickDriver() const { return m_joystickDriver; }
 
     /**
      * @brief setJoystickDriver Set the joystick driver to use.
@@ -59,6 +67,9 @@ private:
 
     JoystickDriver *m_joystickDriver;
     MIDIDriver *m_midiDriver;
+
+    typedef std::set<SessionObserver*> ObserverSet;
+    ObserverSet m_sessionObservers;
 };
 
 #endif

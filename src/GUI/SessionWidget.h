@@ -17,36 +17,45 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef MAINWINDOW_H_
-#define MAINWINDOW_H_
+#ifndef SESSIONWIDGET_H_
+#define SESSIONWIDGET_H_
 
-#include <QMainWindow>
+#include <QWidget>
+#include <QList>
 
+#include "SessionObserver.h"
 
 class Session;
-class SessionWidget;
+class QVBoxLayout;
 
-class MainWindow : public QMainWindow
+class SessionWidget : public QWidget, public SessionObserver
 {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent);
-    virtual ~MainWindow();
+    SessionWidget(QWidget *parent, Session* session);
+    virtual ~SessionWidget();
 
-protected:
-    void closeEvent(QCloseEvent *event);
+    void setSession(Session *session);
 
-private slots:
-    void onActionNewSession();
-    void onActionQuit();
-    void onActionJoystickDriverSelected();
-    void onActionMIDIDriverSelected();
-    void onActionAboutQt();
+    // Methods from SessionObserver
+    virtual void onJoystickDriverChanged();
+    virtual void onMIDIDriverChanged();
+
+//private slots:
+//    void onActionNewSession();
+
+    // Private methods
+private:
+    void onSessionChanged();
+
+    void removeJoystickWidgets();
 
 private:
     Session *m_session;
-    SessionWidget *m_sessionWidget;
+    QVBoxLayout *m_layout;
+
+    QList<QWidget*> m_addedWidgets;
 };
 
-#endif /* MAINWINDOW_H_ */
+#endif

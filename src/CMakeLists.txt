@@ -45,6 +45,7 @@ set (ODE2JOY_SRCS
   JoystickEvent.cpp
   JoystickToMIDIMapper.cpp
   Session.cpp
+  SessionObserver.cpp
 )
 
 set (ODE2JOY_HEADERS
@@ -61,15 +62,18 @@ set (ODE2JOY_HEADERS
   MIDIDriver.h
   JoystickToMIDIMapper.h
   Session.h
+  SessionObserver.h
 )
 
 # Define GUI classes
 set (QT_GUI_MOC_HEADERS
   GUI/MainWindow.h
+  GUI/SessionWidget.h
 )
 
 set (QT_GUI_SRCS
   GUI/MainWindow.cpp
+  GUI/SessionWidget.cpp
 )
 
 SET (QT_GUI_UIS

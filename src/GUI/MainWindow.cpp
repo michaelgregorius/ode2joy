@@ -19,6 +19,8 @@
 
 #include "MainWindow.h"
 
+#include "SessionWidget.h"
+
 #include "Session.h"
 
 #include "Drivers/Joystick/JoystickDriverFactory.h"
@@ -90,10 +92,15 @@ MainWindow::MainWindow(QWidget *parent) :
     mainWindowMenuBar->addMenu(helpMenu);
 
     QObject::connect(aboutQtAction, SIGNAL(triggered()), SLOT(onActionAboutQt()));
+
+    m_sessionWidget = new SessionWidget(this, m_session);
+    setCentralWidget(m_sessionWidget);
 }
 
 MainWindow::~MainWindow()
 {
+    m_sessionWidget->setSession(0);
+
     if (m_session)
     {
         delete m_session;
@@ -114,6 +121,8 @@ void MainWindow::onActionNewSession()
     }
 
     m_session = new Session();
+
+    m_sessionWidget->setSession(m_session);
 }
 
 void MainWindow::onActionQuit()
