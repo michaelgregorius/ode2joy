@@ -29,7 +29,7 @@ include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
 ## Enable all warnings for GCC
 if (CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -Wall -Wno-long-long -pedantic")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -pthread -Wall -Wno-long-long -pedantic")
 endif()
 
 set (ODE2JOY_SRCS
