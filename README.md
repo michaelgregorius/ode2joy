@@ -14,9 +14,20 @@ The input of the axis' might be mapped to:
 * Controllers
 
 ## Current state
-The current implementation only maps joystick button events to hardcoded *note on* and *note off* MIDI events.
+Joysticks are detected with SDL3 (including hot-plugging) and every joystick appears as its own virtual MIDI output port (`ode2joy: <joystick name>`) via RtMidi, which can be selected in a DAW.
 
-An actual mapping and a configuration of the mapping via the graphical user interface is not implemented yet.
+The processing pipeline is:
+
+```
+SDL3 input -> normalized ControlEvents -> mapping engine -> MIDI events -> RtMidi output
+```
+
+The mapping engine supports axes, buttons, hats and pedals/triggers (unipolar axes) with inversion, dead zone, linear/exponential/logarithmic curves, smoothing, rate limiting and suppression of unchanged MIDI values. Buttons mapped to notes are tracked, so held notes get a *note off* when the joystick is unplugged or disabled. Targets are control change, note, pitch bend, program change and channel aftertouch.
+
+Without a profile a joystick uses a default mapping: buttons to notes starting at 36, axes to CC 16 and up, hat X/Y to CC 80 and up.
+
+### Profiles
+Profiles are JSON files. Use *File > Save profile of selected device...* to export the active profile as a starting point, edit it by hand and load it again. A profile is assigned either to the joystick type (SDL GUID) or, if the joystick reports a serial number, to that single device. Profiles are stored in the application config directory (`~/.config/ode2joy/profiles` on Linux). A graphical mapping editor is not implemented yet.
 
 ## Dependencies
 The application requires the following development tools and libraries:
@@ -24,7 +35,11 @@ The application requires the following development tools and libraries:
 * CMake 3.16 or newer
 * A C++17 compiler
 * Qt 6 Widgets
-* ALSA development files on Linux (optional; without them, only the Null MIDI driver is available)
+* SDL3
+* RtMidi
+* pkg-config
+
+RtMidi virtual ports are available on Linux (ALSA/JACK) and macOS (CoreMIDI), but not on Windows.
 
 ## Getting involved in development
 Here are some tips if you want to get involved in the development of *ode2joy*.
@@ -33,13 +48,7 @@ Here are some tips if you want to get involved in the development of *ode2joy*.
 On Debian or Ubuntu, install the required packages with:
 
 ```sh
-sudo apt install git build-essential cmake qt6-base-dev
-```
-
-To build the ALSA MIDI backend as well, install its development package:
-
-```sh
-sudo apt install libasound2-dev
+sudo apt install git build-essential cmake pkg-config qt6-base-dev libsdl3-dev librtmidi-dev
 ```
 
 #### Cloning of the repository
@@ -57,13 +66,9 @@ ctest --test-dir build --output-on-failure
 
 Start the application with `./build/ode2joy`.
 
-### Known caveats
-When developing in VirtualBox the mouse might be reported as device */dev/input/js0*. Currently this device is hard coded as the joystick in the kernel joystick driver found at *Drivers/Joystick/JoystickDriverLinux.cpp*. If you want to develop in VirtualBox you may need to change the device in this file to */dev/input/js1* or something similar.
-
 ## TODOs
 
-* Implement data structures for mappings
-* Implement GUI to define the mappings
-* Highlight joystick events in GUI
-* Implement joystick and MIDI drivers for Windows
+* Implement GUI to edit the mappings, including MIDI learn
+* Show the live values of the controls in the GUI
+* Windows support for MIDI output (no virtual ports in RtMidi)
 

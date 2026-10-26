@@ -17,6 +17,9 @@
  * along with ode2joy.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef MIDIEVENT_H_
+#define MIDIEVENT_H_
+
 #include <cstdint>
 
 
@@ -69,9 +72,13 @@ public:
     inline void setPitchBend(uint16_t pitchBend)
     {
         uint16_t sanitizedPitchBend = pitchBend & 0x3FFF;
-        m_data1 = static_cast<uint8_t>(sanitizedPitchBend & 0x00FF);
-        m_data2 = static_cast<uint8_t>((pitchBend - m_data1) >> 7);
+        m_data1 = static_cast<uint8_t>(sanitizedPitchBend & 0x007F);
+        m_data2 = static_cast<uint8_t>(sanitizedPitchBend >> 7);
     }
+
+    inline uint8_t getStatusByte() const { return m_status; }
+    inline uint8_t getData1Byte() const { return m_data1; }
+    inline uint8_t getData2Byte() const { return m_data2; }
 
 private:
     inline uint8_t getData(uint8_t const & data) const { return data & 0x7F; }
@@ -90,3 +97,5 @@ private:
     uint8_t m_data1; // Always starts with a 0
     uint8_t m_data2; // Always starts with a 0
 };
+
+#endif /* MIDIEVENT_H_ */

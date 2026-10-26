@@ -25,6 +25,7 @@
 int main (int argc, char **argv)
 {
     QApplication app(argc, argv);
+    app.setApplicationName("ode2joy");
 
     MainWindow mainWindow(0);
     mainWindow.show();

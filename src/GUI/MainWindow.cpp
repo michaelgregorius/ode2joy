@@ -19,161 +19,176 @@
 
 #include "MainWindow.h"
 
-#include "SessionWidget.h"
+#include "DeviceListWidget.h"
+#include "PipelineBridge.h"
+#include "ProfileStore.h"
 
-#include "Session.h"
-
-#include "Drivers/Joystick/JoystickDriverFactory.h"
-#include "Drivers/MIDI/MIDIDriverFactory.h"
+#include "core/Pipeline.h"
+#include "core/SdlInput.h"
 
 #include <QAction>
+#include <QFileDialog>
+#include <QIcon>
 #include <QMenuBar>
 #include <QMenu>
 #include <QMessageBox>
-
-#include <iostream>
+#include <QStatusBar>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    m_session(0)
+    m_library(std::make_shared<ProfileLibrary>()),
+    m_store(new ProfileStore(*m_library)),
+    m_bridge(new PipelineBridge()),
+    m_deviceList(new DeviceListWidget(this))
 {
     this->setWindowTitle("ode2joy");
     this->setWindowIcon(QIcon(":/images/application-icon.png"));
+    resize(640, 320);
+    setCentralWidget(m_deviceList);
 
-    // Build menu
     QMenuBar *mainWindowMenuBar = this->menuBar();
     QMenu *fileMenu = new QMenu(QMenu::tr("&File"), mainWindowMenuBar);
-
-    QAction *newSessionAction = fileMenu->addAction(QMenu::tr("&New session"));
-    newSessionAction->setShortcuts(QKeySequence::New);
-    QObject::connect(newSessionAction, &QAction::triggered, this, &MainWindow::onActionNewSession);
-
-    QAction *quitAction = fileMenu->addAction(QMenu::tr("&Quit"));
+    fileMenu->addAction(QMenu::tr("&Load profile for device type..."), this, &MainWindow::onActionLoadTypeProfile);
+    fileMenu->addAction(QMenu::tr("Load profile for this &device only..."), this, &MainWindow::onActionLoadDeviceProfile);
+    fileMenu->addAction(QMenu::tr("&Save profile of selected device..."), this, &MainWindow::onActionSaveProfile);
+    fileMenu->addAction(QMenu::tr("&Reset to default profile"), this, &MainWindow::onActionResetProfile);
+    fileMenu->addSeparator();
+    QAction *quitAction = fileMenu->addAction(QMenu::tr("&Quit"), this, &MainWindow::onActionQuit);
     quitAction->setShortcuts(QKeySequence::Quit);
-    QObject::connect(quitAction, &QAction::triggered, this, &MainWindow::onActionQuit);
-
     mainWindowMenuBar->addMenu(fileMenu);
 
-    // Drivers menu
-    QMenu *driverMenu = new QMenu(QMenu::tr("&Driver"), mainWindowMenuBar);
-
-    // Joystick sub menu
-    QMenu *joystickDriverMenu = new QMenu(QMenu::tr("&Joystick"), driverMenu);
-    driverMenu->addMenu(joystickDriverMenu);
-    JoystickDriverFactory const *factory = JoystickDriverFactory::getInstance();
-    JoystickDriverFactory::DriverDescriptionCollection descriptions = factory->getDriverDescriptions();
-
-    for (auto d : descriptions)
-    {
-        QAction *joysticDriverAction = joystickDriverMenu->addAction(QString::fromStdString(d.getDescription()));
-        joysticDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
-        QObject::connect(joysticDriverAction, &QAction::triggered, this, &MainWindow::onActionJoystickDriverSelected);
-    }
-
-    // MIDI sub menu
-    QMenu *midiDriverMenu = new QMenu(QMenu::tr("&MIDI"), driverMenu);
-    driverMenu->addMenu(midiDriverMenu);
-    MIDIDriverFactory const *midiFactory = MIDIDriverFactory::getInstance();
-    MIDIDriverFactory::DriverDescriptionCollection midiDescriptions = midiFactory->getDriverDescriptions();
-
-    for (auto d : midiDescriptions)
-    {
-        QAction *midiDriverAction = midiDriverMenu->addAction(QString::fromStdString(d.getDescription()));
-        midiDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
-        QObject::connect(midiDriverAction, &QAction::triggered, this, &MainWindow::onActionMIDIDriverSelected);
-    }
-
-    mainWindowMenuBar->addMenu(driverMenu);
-
-    // Help menu
     QMenu *helpMenu = new QMenu(QMenu::tr("&Help"), mainWindowMenuBar);
-
-    QAction *aboutQtAction = helpMenu->addAction(QMenu::tr("About Qt..."));
+    helpMenu->addAction(QMenu::tr("About Qt..."), this, &MainWindow::onActionAboutQt);
     mainWindowMenuBar->addMenu(helpMenu);
 
-    QObject::connect(aboutQtAction, &QAction::triggered, this, &MainWindow::onActionAboutQt);
+    connect(m_bridge.get(), &PipelineBridge::deviceConnected, this,
+            [this](DeviceInfo info, QString profile) { m_deviceList->addDevice(info, profile); });
+    connect(m_bridge.get(), &PipelineBridge::deviceDisconnected, this,
+            [this](quint32 id) { m_deviceList->removeDevice(id); });
+    connect(m_bridge.get(), &PipelineBridge::deviceProfileChanged, this,
+            [this](quint32 id, QString profile) { m_deviceList->setProfileName(id, profile); });
+    connect(m_bridge.get(), &PipelineBridge::activity, this,
+            [this](quint32 id) { m_deviceList->flashActivity(id); });
+    connect(m_bridge.get(), &PipelineBridge::error, this,
+            [this](QString message) { statusBar()->showMessage(message, 10000); });
 
-    m_sessionWidget = new SessionWidget(this, m_session);
-    setCentralWidget(m_sessionWidget);
+    m_store->load();
+
+    m_pipeline.reset(new Pipeline(std::unique_ptr<InputBackend>(new SdlInput()), createRtMidiOutput, m_library));
+    m_pipeline->setListener(m_bridge.get());
+
+    connect(m_deviceList, &DeviceListWidget::deviceEnabledChanged, this,
+            [this](quint32 id, bool enabled) { m_pipeline->setDeviceEnabled(id, enabled); });
+
+    std::string error;
+    if (!m_pipeline->start(error))
+    {
+        QMessageBox::critical(this, tr("Joystick input unavailable"),
+                              tr("Could not initialize SDL: %1").arg(QString::fromStdString(error)));
+    }
 }
 
 MainWindow::~MainWindow()
 {
-    m_sessionWidget->setSession(0);
+    // The worker thread must stop before the bridge and library go away.
+    m_pipeline->stop();
+}
 
-    if (m_session)
+void MainWindow::onActionLoadTypeProfile()
+{
+    loadProfile(false);
+}
+
+void MainWindow::onActionLoadDeviceProfile()
+{
+    loadProfile(true);
+}
+
+void MainWindow::loadProfile(bool forThisDeviceOnly)
+{
+    DeviceInfo device;
+    if (!m_deviceList->selectedDevice(device))
     {
-        delete m_session;
-        m_session = 0;
+        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
+        return;
+    }
+
+    if (forThisDeviceOnly && device.serial.empty())
+    {
+        QMessageBox::information(this, tr("No serial number"),
+                                 tr("This joystick does not report a serial number, so a profile can only be assigned to its type."));
+        return;
+    }
+
+    QString const path = QFileDialog::getOpenFileName(this, tr("Load profile"), QString(), tr("Profiles (*.json)"));
+    if (path.isEmpty())
+    {
+        return;
+    }
+
+    Profile profile;
+    QString error;
+    if (!ProfileStore::readProfileFile(path, profile, error))
+    {
+        QMessageBox::warning(this, tr("Cannot load profile"), error);
+        return;
+    }
+
+    profile.deviceGuid = device.guid;
+    profile.deviceSerial = forThisDeviceOnly ? device.serial : std::string();
+
+    bool const saved = forThisDeviceOnly ? m_store->saveInstanceProfile(profile, error)
+                                         : m_store->saveTypeProfile(profile, error);
+    if (!saved)
+    {
+        QMessageBox::warning(this, tr("Cannot store profile"), error);
+    }
+
+    m_pipeline->reloadProfiles();
+}
+
+void MainWindow::onActionSaveProfile()
+{
+    DeviceInfo device;
+    if (!m_deviceList->selectedDevice(device))
+    {
+        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
+        return;
+    }
+
+    QString const path = QFileDialog::getSaveFileName(this, tr("Save profile"), QString(), tr("Profiles (*.json)"));
+    if (path.isEmpty())
+    {
+        return;
+    }
+
+    QString error;
+    if (!ProfileStore::writeProfileFile(path, m_library->resolve(device), error))
+    {
+        QMessageBox::warning(this, tr("Cannot save profile"), error);
     }
 }
 
-void MainWindow::closeEvent(QCloseEvent *event)
+void MainWindow::onActionResetProfile()
 {
-    QMainWindow::closeEvent(event);
-}
-
-void MainWindow::onActionNewSession()
-{
-    if (m_session)
+    DeviceInfo device;
+    if (!m_deviceList->selectedDevice(device))
     {
-        delete m_session;
+        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
+        return;
     }
 
-    m_session = new Session();
-
-    m_sessionWidget->setSession(m_session);
+    if (!device.serial.empty())
+    {
+        m_store->removeInstanceProfile(device.guid, device.serial);
+    }
+    m_store->removeTypeProfile(device.guid);
+    m_pipeline->reloadProfiles();
 }
 
 void MainWindow::onActionQuit()
 {
     this->close();
-}
-
-void MainWindow::onActionJoystickDriverSelected()
-{
-    if (!m_session)
-    {
-        QMessageBox::information(this,
-                                 tr("No session started"),
-                                 tr("Please start a session before selecting a joystick driver!"));
-
-        return;
-    }
-
-    QObject *s = sender();
-
-    QAction *action = dynamic_cast<QAction*>(s);
-    if (action)
-    {
-        std::string key = action->data().toString().toStdString();
-
-        JoystickDriver *driver = JoystickDriverFactory::getInstance()->createDriver(key);
-        m_session->setJoystickDriver(driver);
-    }
-}
-
-void MainWindow::onActionMIDIDriverSelected()
-{
-    if (!m_session)
-    {
-        QMessageBox::information(this,
-                                 tr("No session started"),
-                                 tr("Please start a session before selecting a MIDI driver!"));
-
-        return;
-    }
-
-    QObject *s = sender();
-
-    QAction *action = dynamic_cast<QAction*>(s);
-    if (action)
-    {
-        std::string key = action->data().toString().toStdString();
-
-        MIDIDriver *driver = MIDIDriverFactory::getInstance()->createDriver(key);
-        m_session->setMIDIDriver(driver);
-    }
 }
 
 void MainWindow::onActionAboutQt()

@@ -22,9 +22,13 @@
 
 #include <QMainWindow>
 
+#include <memory>
 
-class Session;
-class SessionWidget;
+class DeviceListWidget;
+class Pipeline;
+class PipelineBridge;
+class ProfileLibrary;
+class ProfileStore;
 
 class MainWindow : public QMainWindow
 {
@@ -34,19 +38,23 @@ public:
     MainWindow(QWidget *parent);
     virtual ~MainWindow();
 
-protected:
-    void closeEvent(QCloseEvent *event);
-
 private slots:
-    void onActionNewSession();
+    void onActionLoadTypeProfile();
+    void onActionLoadDeviceProfile();
+    void onActionSaveProfile();
+    void onActionResetProfile();
     void onActionQuit();
-    void onActionJoystickDriverSelected();
-    void onActionMIDIDriverSelected();
     void onActionAboutQt();
 
 private:
-    Session *m_session;
-    SessionWidget *m_sessionWidget;
+    void loadProfile(bool forThisDeviceOnly);
+
+private:
+    std::shared_ptr<ProfileLibrary> m_library;
+    std::unique_ptr<ProfileStore> m_store;
+    std::unique_ptr<PipelineBridge> m_bridge;
+    std::unique_ptr<Pipeline> m_pipeline;
+    DeviceListWidget *m_deviceList;
 };
 
 #endif /* MAINWINDOW_H_ */

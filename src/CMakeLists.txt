@@ -9,62 +9,52 @@ message(STATUS "Building on ${CMAKE_SYSTEM_NAME}...")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Threads REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+pkg_check_modules(RTMIDI REQUIRED IMPORTED_TARGET rtmidi)
 
-set(ODE2JOY_HAVE_ALSA OFF)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  find_package(ALSA QUIET)
-  if(ALSA_FOUND)
-    set(ODE2JOY_HAVE_ALSA ON)
-    message(STATUS "ALSA found; enabling the ALSA MIDI driver")
-  else()
-    message(STATUS "ALSA development files not found; building without the ALSA MIDI driver")
-  endif()
-endif()
-
-set (ODE2JOY_SRCS
-  Drivers/Joystick/JoystickDriverFactory.cpp
-  Drivers/Joystick/JoystickDriverLinux.cpp
-  Drivers/Joystick/JoystickDriverNull.cpp
-  Drivers/MIDI/MIDIDriverFactory.cpp
-  Drivers/MIDI/MIDIDriverNull.cpp
+# Qt-free core: SDL3 input, mapping engine, RtMidi output
+add_library(ode2joy_core STATIC
   MIDI/MIDIEvent.cpp
-  JoystickDriver.cpp
-  Joystick.cpp
-  JoystickEvent.cpp
-  JoystickToMIDIMapper.cpp
-  Session.cpp
-  SessionObserver.cpp
-)
-
-set (ODE2JOY_HEADERS
-  Drivers/Joystick/JoystickDriverFactory.h
-  Drivers/Joystick/JoystickDriverLinux.h
-  Drivers/Joystick/JoystickDriverNull.h
-  Drivers/MIDI/MIDIDriverFactory.h
-  Drivers/MIDI/MIDIDriverNull.h
-  Drivers/DriverDescription.h
   MIDI/MIDIEvent.h
-  JoystickDriver.h
-  MIDIDriver.h
-  JoystickToMIDIMapper.h
-  Session.h
-  SessionObserver.h
+  core/ControlEvent.h
+  core/InputBackend.h
+  core/Mapping.h
+  core/MappingEngine.cpp
+  core/MappingEngine.h
+  core/MidiOutput.h
+  core/Pipeline.cpp
+  core/Pipeline.h
+  core/Processing.cpp
+  core/Processing.h
+  core/ProfileLibrary.cpp
+  core/ProfileLibrary.h
+  core/RtMidiOutput.cpp
+  core/SdlInput.cpp
+  core/SdlInput.h
 )
+target_include_directories(ode2joy_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/core)
+target_link_libraries(ode2joy_core PUBLIC PkgConfig::SDL3 PkgConfig::RTMIDI Threads::Threads)
 
-if(ODE2JOY_HAVE_ALSA)
-  list(APPEND ODE2JOY_SRCS Drivers/MIDI/MIDIDriverALSA.cpp)
-  list(APPEND ODE2JOY_HEADERS Drivers/MIDI/MIDIDriverALSA.h)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(ode2joy_core PRIVATE -Wall -Wno-long-long -pedantic)
 endif()
 
 # Define GUI classes
 set (QT_GUI_HEADERS
+  GUI/DeviceListWidget.h
   GUI/MainWindow.h
-  GUI/SessionWidget.h
+  GUI/PipelineBridge.h
+  GUI/ProfileJson.h
+  GUI/ProfileStore.h
 )
 
 set (QT_GUI_SRCS
+  GUI/DeviceListWidget.cpp
   GUI/MainWindow.cpp
-  GUI/SessionWidget.cpp
+  GUI/PipelineBridge.cpp
+  GUI/ProfileJson.cpp
+  GUI/ProfileStore.cpp
 )
 
 set (QT_GUI_RCCS GUI/Resources/resources.qrc)
@@ -80,8 +70,6 @@ endif (APPLE)
 add_executable(ode2joy
   ${GUI_TYPE}
   main.cpp
-  ${ODE2JOY_SRCS}
-  ${ODE2JOY_HEADERS}
   ${QT_GUI_HEADERS}
   ${QT_GUI_SRCS}
   ${QT_GUI_RCCS}
@@ -92,12 +80,7 @@ set_target_properties(ode2joy PROPERTIES
   AUTORCC ON
 )
 target_include_directories(ode2joy PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(ode2joy PRIVATE Qt6::Widgets Threads::Threads)
-
-if(ODE2JOY_HAVE_ALSA)
-  target_compile_definitions(ode2joy PRIVATE ODE2JOY_HAVE_ALSA)
-  target_link_libraries(ode2joy PRIVATE ALSA::ALSA)
-endif()
+target_link_libraries(ode2joy PRIVATE ode2joy_core Qt6::Widgets)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(ode2joy PRIVATE -Wall -Wno-long-long -pedantic)
@@ -112,32 +95,41 @@ install (TARGETS ode2joy
 # Unit test section
 enable_testing()
 
-add_executable(MIDITest
-  UnitTests/MIDITest.cpp
-  MIDI/MIDIEvent.cpp
-  Drivers/MIDI/MIDIDriverFactory.cpp
-  Drivers/MIDI/MIDIDriverNull.cpp
-)
-target_include_directories(MIDITest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-
-if(ODE2JOY_HAVE_ALSA)
-  target_sources(MIDITest PRIVATE Drivers/MIDI/MIDIDriverALSA.cpp)
-  target_compile_definitions(MIDITest PRIVATE ODE2JOY_HAVE_ALSA)
-  target_link_libraries(MIDITest PRIVATE ALSA::ALSA)
-endif()
+add_executable(MIDITest UnitTests/MIDITest.cpp)
+target_link_libraries(MIDITest PRIVATE ode2joy_core)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(MIDITest PRIVATE -Wall -Wno-long-long -pedantic)
 endif()
 
-add_test(MIDI-Status MIDITest test_status)
-add_test(MIDI-Channel MIDITest test_channel)
-add_test(MIDI-Note MIDITest test_note)
-add_test(MIDI-Velocity MIDITest test_velocity)
-add_test(MIDI-PolyphonicAftertouch MIDITest test_polyphonic_aftertouch)
-add_test(MIDI-Controller MIDITest test_controller)
-add_test(MIDI-ControllerValue MIDITest test_controller_value)
-add_test(MIDI-ProgramChange MIDITest test_program_change)
-add_test(MIDI-ChannelAftertouch MIDITest test_channel_aftertouch)
-add_test(MIDI-Pitchbend MIDITest test_pitch_bend)
-add_test(MIDI-DriverFactory MIDITest test_driver_factory)
+set(ODE2JOY_TESTS
+  test_status
+  test_channel
+  test_note
+  test_velocity
+  test_polyphonic_aftertouch
+  test_controller
+  test_controller_value
+  test_program_change
+  test_channel_aftertouch
+  test_pitch_bend
+  test_dead_zone
+  test_curves
+  test_quantize
+  test_axis_to_cc
+  test_invert_and_dead_zone
+  test_unipolar_axis
+  test_change_suppression
+  test_rate_limit_and_flush
+  test_smoothing
+  test_pitch_bend_target
+  test_button_note_tracking
+  test_release_on_remove
+  test_hat_mappings
+  test_pipeline_disconnect_releases_notes
+  test_profile_library_resolution
+)
+
+foreach(t ${ODE2JOY_TESTS})
+  add_test(NAME ${t} COMMAND MIDITest ${t})
+endforeach()

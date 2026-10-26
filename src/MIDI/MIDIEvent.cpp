@@ -19,7 +19,10 @@
 
 #include "MIDIEvent.h"
 
-MIDIEvent::MIDIEvent()
+MIDIEvent::MIDIEvent() :
+    m_status(NoteOff),
+    m_data1(0),
+    m_data2(0)
 {
 }
 

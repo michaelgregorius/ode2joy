@@ -18,11 +18,19 @@
  */
 
 #include "MIDI/MIDIEvent.h"
-#include "Drivers/MIDI/MIDIDriverFactory.h"
-#include "MIDIDriver.h"
+#include "core/MappingEngine.h"
+#include "core/Pipeline.h"
+#include "core/Processing.h"
 
-#include <vector>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <functional>
 #include <iostream>
+#include <map>
+#include <string>
+#include <thread>
+#include <vector>
 
 int const error = 1;
 
@@ -194,104 +202,579 @@ int test_pitch_bend()
     return 0;
 }
 
-int test_driver_factory()
+// ---- Processing ----
+
+bool near(float a, float b, float eps = 1e-4f)
 {
-    MIDIDriverFactory const *factory = MIDIDriverFactory::getInstance();
-    MIDIDriverFactory::DriverDescriptionCollection const &descriptions = factory->getDriverDescriptions();
-    bool nullDriverAvailable = false;
-    bool alsaDriverAvailable = false;
+    return std::abs(a - b) <= eps;
+}
 
-    for (DriverDescription const &description : descriptions)
+int test_dead_zone()
+{
+    if (applyDeadZone(0.04f, 0.1f) != 0.0f || applyDeadZone(-0.09f, 0.1f) != 0.0f)
     {
-        if (description.getKey() == "null")
+        return error;
+    }
+    if (!near(applyDeadZone(1.0f, 0.1f), 1.0f) || !near(applyDeadZone(-1.0f, 0.1f), -1.0f))
+    {
+        return error;
+    }
+    if (!near(applyDeadZone(0.55f, 0.1f), 0.5f) || !near(applyDeadZone(-0.55f, 0.1f), -0.5f))
+    {
+        return error;
+    }
+    if (applyUnipolarDeadZone(0.05f, 0.1f) != 0.0f || !near(applyUnipolarDeadZone(1.0f, 0.1f), 1.0f))
+    {
+        return error;
+    }
+
+    return 0;
+}
+
+int test_curves()
+{
+    Curve exponential = { CurveType::Exponential, 3.0f };
+    Curve logarithmic = { CurveType::Logarithmic, 3.0f };
+    Curve linear;
+
+    for (Curve const &c : { exponential, logarithmic, linear })
+    {
+        if (!near(applyCurve(0.0f, c), 0.0f) || !near(applyCurve(1.0f, c), 1.0f) || !near(applyCurve(-1.0f, c), -1.0f))
         {
-            nullDriverAvailable = true;
+            return error;
         }
-        else if (description.getKey() == "alsa")
+    }
+
+    if (!(applyCurve(0.5f, exponential) < 0.5f) || !(applyCurve(0.5f, logarithmic) > 0.5f))
+    {
+        return error;
+    }
+    if (!near(applyCurve(-0.5f, exponential), -applyCurve(0.5f, exponential)))
+    {
+        return error;
+    }
+    // The curves are inverses of each other.
+    return near(applyCurve(applyCurve(0.3f, exponential), logarithmic), 0.3f) ? 0 : error;
+}
+
+int test_quantize()
+{
+    if (quantize7(0.0f) != 0 || quantize7(1.0f) != 127 || quantize7(2.0f) != 127 || quantize7(-1.0f) != 0)
+    {
+        return error;
+    }
+    return (quantize14(1.0f) == 16383 && quantize14(0.0f) == 0) ? 0 : error;
+}
+
+// ---- Mapping engine ----
+
+namespace
+{
+
+DeviceId const dev = 1;
+uint64_t const ms = 1000000;
+
+Mapping axisToCC(int axis, int cc)
+{
+    Mapping m;
+    m.source.type = ControlType::Axis;
+    m.source.index = axis;
+    m.target.kind = MidiTargetKind::ControlChange;
+    m.target.number = static_cast<uint8_t>(cc);
+    m.maxRateHz = 0.0f;
+    return m;
+}
+
+Mapping buttonToNote(int button, int note)
+{
+    Mapping m;
+    m.source.type = ControlType::Button;
+    m.source.index = button;
+    m.target.kind = MidiTargetKind::Note;
+    m.target.number = static_cast<uint8_t>(note);
+    return m;
+}
+
+ControlEvent ev(ControlType type, int index, float value, uint64_t t)
+{
+    ControlEvent e;
+    e.device = dev;
+    e.type = type;
+    e.index = index;
+    e.value = value;
+    e.timestamp = t;
+    return e;
+}
+
+MappingEngine::Events run(MappingEngine &engine, ControlEvent const &e)
+{
+    MappingEngine::Events out;
+    engine.processEvent(e, out);
+    return out;
+}
+
+void install(MappingEngine &engine, std::vector<Mapping> const &mappings)
+{
+    Profile p;
+    p.mappings = mappings;
+    MappingEngine::Events out;
+    engine.setProfile(dev, p, out);
+}
+
+} // namespace
+
+int test_axis_to_cc()
+{
+    MappingEngine engine;
+    install(engine, { axisToCC(2, 74) });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 2, 1.0f, 0));
+    if (out.size() != 1 || out[0].getStatus() != MIDIEvent::ControlChange || out[0].getController() != 74
+        || out[0].getControllerValue() != 127)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Axis, 2, -1.0f, ms));
+    if (out.size() != 1 || out[0].getControllerValue() != 0)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Axis, 2, 0.0f, 2 * ms));
+    if (out.size() != 1 || out[0].getControllerValue() != 64)
+    {
+        return error;
+    }
+
+    // Other axes and other devices are ignored.
+    if (!run(engine, ev(ControlType::Axis, 3, 1.0f, 3 * ms)).empty())
+    {
+        return error;
+    }
+    ControlEvent other = ev(ControlType::Axis, 2, 1.0f, 3 * ms);
+    other.device = 99;
+    return run(engine, other).empty() ? 0 : error;
+}
+
+int test_invert_and_dead_zone()
+{
+    Mapping m = axisToCC(0, 1);
+    m.invert = true;
+    m.deadZone = 0.1f;
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 0, 1.0f, 0));
+    if (out.size() != 1 || out[0].getControllerValue() != 0)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Axis, 0, 0.05f, ms));
+    return (out.size() == 1 && out[0].getControllerValue() == 64) ? 0 : error;
+}
+
+int test_unipolar_axis()
+{
+    Mapping m = axisToCC(0, 1);
+    m.range = AxisRange::Unipolar;
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 0, -1.0f, 0));
+    if (out.size() != 1 || out[0].getControllerValue() != 0)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Axis, 0, 1.0f, ms));
+    return (out.size() == 1 && out[0].getControllerValue() == 127) ? 0 : error;
+}
+
+int test_change_suppression()
+{
+    MappingEngine engine;
+    install(engine, { axisToCC(0, 1) });
+
+    if (run(engine, ev(ControlType::Axis, 0, 0.5f, 0)).size() != 1)
+    {
+        return error;
+    }
+
+    // A raw change far below one MIDI step must not produce a message.
+    if (!run(engine, ev(ControlType::Axis, 0, 0.5001f, ms)).empty())
+    {
+        return error;
+    }
+
+    return run(engine, ev(ControlType::Axis, 0, 0.8f, 2 * ms)).size() == 1 ? 0 : error;
+}
+
+int test_rate_limit_and_flush()
+{
+    Mapping m = axisToCC(0, 1);
+    m.maxRateHz = 100.0f; // 10 ms
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    if (run(engine, ev(ControlType::Axis, 0, -1.0f, 0)).size() != 1)
+    {
+        return error;
+    }
+    if (!run(engine, ev(ControlType::Axis, 0, 1.0f, 2 * ms)).empty() || !engine.hasPending(dev))
+    {
+        return error;
+    }
+
+    MappingEngine::Events out;
+    engine.flush(dev, 5 * ms, out);
+    if (!out.empty())
+    {
+        return error;
+    }
+
+    engine.flush(dev, 12 * ms, out);
+    if (out.size() != 1 || out[0].getControllerValue() != 127 || engine.hasPending(dev))
+    {
+        return error;
+    }
+
+    return 0;
+}
+
+int test_smoothing()
+{
+    Mapping m = axisToCC(0, 1);
+    m.smoothing = 20.0f;
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    run(engine, ev(ControlType::Axis, 0, -1.0f, 0));
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 0, 1.0f, ms));
+    if (!out.empty() && out[0].getControllerValue() > 20)
+    {
+        return error; // Must not jump to the target at once
+    }
+
+    int last = 0;
+    for (uint64_t t = 2; t < 400; ++t)
+    {
+        out.clear();
+        engine.flush(dev, t * ms, out);
+        for (MIDIEvent const &e : out)
         {
-            alsaDriverAvailable = true;
+            if (e.getControllerValue() < last)
+            {
+                return error;
+            }
+            last = e.getControllerValue();
         }
     }
 
-    if (!nullDriverAvailable)
+    return (last == 127 && !engine.hasPending(dev)) ? 0 : error;
+}
+
+int test_pitch_bend_target()
+{
+    Mapping m = axisToCC(0, 0);
+    m.target.kind = MidiTargetKind::PitchBend;
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 0, 1.0f, 0));
+    if (out.size() != 1 || out[0].getStatus() != MIDIEvent::PitchBending || out[0].getPitchBend() != 16383)
     {
         return error;
     }
 
-#ifdef ODE2JOY_HAVE_ALSA
-    if (!alsaDriverAvailable)
-    {
-        return error;
-    }
-#else
-    if (alsaDriverAvailable)
-    {
-        return error;
-    }
-#endif
+    out = run(engine, ev(ControlType::Axis, 0, -1.0f, ms));
+    return (out.size() == 1 && out[0].getPitchBend() == 0) ? 0 : error;
+}
 
-    MIDIDriver *nullDriver = factory->createDriver("null");
-    if (!nullDriver)
+int test_button_note_tracking()
+{
+    Mapping m = buttonToNote(0, 60);
+    m.target.channel = 2;
+    m.target.onValue = 90;
+
+    MappingEngine engine;
+    install(engine, { m });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Button, 0, 1.0f, 0));
+    if (out.size() != 1 || out[0].getStatus() != MIDIEvent::NoteOn || out[0].getNote() != 60
+        || out[0].getChannel() != 2 || out[0].getVelocity() != 90)
     {
         return error;
     }
-    delete nullDriver;
 
-    return factory->createDriver("unknown") ? error : 0;
+    // Repeated press events do not retrigger.
+    if (!run(engine, ev(ControlType::Button, 0, 1.0f, ms)).empty())
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Button, 0, 0.0f, 2 * ms));
+    return (out.size() == 1 && out[0].getStatus() == MIDIEvent::NoteOff && out[0].getNote() == 60) ? 0 : error;
+}
+
+int test_release_on_remove()
+{
+    MappingEngine engine;
+    install(engine, { buttonToNote(0, 60), buttonToNote(1, 62) });
+
+    run(engine, ev(ControlType::Button, 0, 1.0f, 0));
+    run(engine, ev(ControlType::Button, 1, 1.0f, 0));
+    run(engine, ev(ControlType::Button, 1, 0.0f, ms));
+
+    MappingEngine::Events out;
+    engine.removeDevice(dev, out);
+    if (out.size() != 1 || out[0].getStatus() != MIDIEvent::NoteOff || out[0].getNote() != 60)
+    {
+        return error;
+    }
+
+    out.clear();
+    engine.removeDevice(dev, out);
+    return out.empty() ? 0 : error;
+}
+
+int test_hat_mappings()
+{
+    Mapping x = axisToCC(0, 10);
+    x.source.type = ControlType::Hat;
+    x.hatComponent = HatComponent::X;
+
+    Mapping up = buttonToNote(0, 40);
+    up.source.type = ControlType::Hat;
+    up.hatComponent = HatComponent::Up;
+
+    MappingEngine engine;
+    install(engine, { x, up });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Hat, 0, static_cast<float>(HatRight | HatUp), 0));
+    if (out.size() != 2 || out[0].getControllerValue() != 127 || out[1].getStatus() != MIDIEvent::NoteOn)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Hat, 0, static_cast<float>(HatLeft), ms));
+    if (out.size() != 2 || out[0].getControllerValue() != 0 || out[1].getStatus() != MIDIEvent::NoteOff)
+    {
+        return error;
+    }
+
+    return 0;
+}
+
+// ---- Pipeline ----
+
+namespace
+{
+
+class FakeInput : public InputBackend
+{
+public:
+    bool init(std::string &) override { return true; }
+    void shutdown() override {}
+    uint64_t nowNs() const override
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
+
+    void poll(int timeoutMs, InputListener &listener) override
+    {
+        std::vector<std::function<void(InputListener &)>> steps;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            steps.swap(m_steps);
+        }
+        for (auto &s : steps)
+        {
+            s(listener);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(timeoutMs));
+    }
+
+    void push(std::function<void(InputListener &)> step)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_steps.push_back(step);
+    }
+
+private:
+    std::mutex m_mutex;
+    std::vector<std::function<void(InputListener &)>> m_steps;
+};
+
+struct Sent
+{
+    std::mutex mutex;
+    std::vector<MIDIEvent> events;
+
+    size_t count()
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        return events.size();
+    }
+
+    bool waitFor(size_t n)
+    {
+        for (int i = 0; i < 500; ++i)
+        {
+            if (count() >= n)
+            {
+                return true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+        }
+        return false;
+    }
+};
+
+class RecordingOutput : public MidiOutput
+{
+public:
+    explicit RecordingOutput(Sent &sent) : m_sent(sent) {}
+
+    void send(MIDIEvent const &e) override
+    {
+        std::lock_guard<std::mutex> lock(m_sent.mutex);
+        m_sent.events.push_back(e);
+    }
+
+private:
+    Sent &m_sent;
+};
+
+} // namespace
+
+int test_pipeline_disconnect_releases_notes()
+{
+    Sent sent;
+    FakeInput *input = new FakeInput();
+    auto library = std::make_shared<ProfileLibrary>();
+
+    Pipeline pipeline(std::unique_ptr<InputBackend>(input),
+                      [&sent](DeviceInfo const &, std::string &) { return std::unique_ptr<MidiOutput>(new RecordingOutput(sent)); },
+                      library);
+
+    std::string err;
+    if (!pipeline.start(err))
+    {
+        return error;
+    }
+
+    DeviceInfo info;
+    info.id = dev;
+    info.name = "Fake";
+    info.guid = "fake-guid";
+    info.numButtons = 2;
+
+    input->push([info](InputListener &l) { l.onDeviceAdded(info); });
+    input->push([](InputListener &l) { l.onControlEvent(ev(ControlType::Button, 0, 1.0f, 1)); });
+
+    // Default profile maps button 0 to note 36.
+    if (!sent.waitFor(1))
+    {
+        return error;
+    }
+
+    input->push([](InputListener &l) { l.onDeviceRemoved(dev); });
+    if (!sent.waitFor(2))
+    {
+        return error;
+    }
+
+    pipeline.stop();
+
+    std::lock_guard<std::mutex> lock(sent.mutex);
+    return (sent.events.size() == 2 && sent.events[0].getStatus() == MIDIEvent::NoteOn
+            && sent.events[1].getStatus() == MIDIEvent::NoteOff && sent.events[1].getNote() == 36) ? 0 : error;
+}
+
+int test_profile_library_resolution()
+{
+    ProfileLibrary library;
+    DeviceInfo info;
+    info.guid = "g";
+    info.serial = "s1";
+
+    if (library.resolve(info).name != "Default")
+    {
+        return error;
+    }
+
+    Profile type;
+    type.name = "Type";
+    library.setTypeProfile("g", type);
+    if (library.resolve(info).name != "Type")
+    {
+        return error;
+    }
+
+    Profile instance;
+    instance.name = "Instance";
+    library.setInstanceProfile("g", "s1", instance);
+    if (library.resolve(info).name != "Instance")
+    {
+        return error;
+    }
+
+    info.serial = "s2";
+    if (library.resolve(info).name != "Type")
+    {
+        return error;
+    }
+
+    return 0;
 }
 
 int main (int argc, char **argv)
 {
+    std::map<std::string, std::function<int()>> const tests = {
+        { "test_status", test_status },
+        { "test_channel", test_channel },
+        { "test_note", test_note },
+        { "test_velocity", test_velocity },
+        { "test_polyphonic_aftertouch", test_polyphonic_aftertouch },
+        { "test_controller", test_controller },
+        { "test_controller_value", test_controller_value },
+        { "test_program_change", test_program_change },
+        { "test_channel_aftertouch", test_channel_aftertouch },
+        { "test_pitch_bend", test_pitch_bend },
+        { "test_dead_zone", test_dead_zone },
+        { "test_curves", test_curves },
+        { "test_quantize", test_quantize },
+        { "test_axis_to_cc", test_axis_to_cc },
+        { "test_invert_and_dead_zone", test_invert_and_dead_zone },
+        { "test_unipolar_axis", test_unipolar_axis },
+        { "test_change_suppression", test_change_suppression },
+        { "test_rate_limit_and_flush", test_rate_limit_and_flush },
+        { "test_smoothing", test_smoothing },
+        { "test_pitch_bend_target", test_pitch_bend_target },
+        { "test_button_note_tracking", test_button_note_tracking },
+        { "test_release_on_remove", test_release_on_remove },
+        { "test_hat_mappings", test_hat_mappings },
+        { "test_pipeline_disconnect_releases_notes", test_pipeline_disconnect_releases_notes },
+        { "test_profile_library_resolution", test_profile_library_resolution }
+    };
+
     if (argc == 2)
     {
-        int errorCode = 0;
-        std::string testName(argv[1]);
-        if (testName == "test_status")
+        auto it = tests.find(argv[1]);
+        if (it == tests.end())
         {
-            errorCode = test_status();
+            std::cerr << "Unknown test " << argv[1] << std::endl;
+            return error;
         }
-        else if (testName == "test_channel")
-        {
-            errorCode = test_channel();
-        }
-        else if (testName == "test_note")
-        {
-            errorCode = test_note();
-        }
-        else if (testName == "test_velocity")
-        {
-            errorCode = test_velocity();
-        }
-        else if (testName == "test_polyphonic_aftertouch")
-        {
-            errorCode = test_polyphonic_aftertouch();
-        }
-        else if (testName == "test_controller")
-        {
-            errorCode = test_controller();
-        }
-        else if (testName == "test_controller_value")
-        {
-            errorCode = test_controller_value();
-        }
-        else if (testName == "test_program_change")
-        {
-            errorCode = test_program_change();
-        }
-        else if (testName == "test_channel_aftertouch")
-        {
-            errorCode = test_channel_aftertouch();
-        }
-        else if (testName == "test_pitch_bend")
-        {
-            errorCode = test_pitch_bend();
-        }
-        else if (testName == "test_driver_factory")
-        {
-            errorCode = test_driver_factory();
-        }
-
-        return errorCode;
+        return it->second();
     }
 
     return 0;
