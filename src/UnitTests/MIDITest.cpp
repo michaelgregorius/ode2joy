@@ -18,6 +18,8 @@
  */
 
 #include "MIDI/MIDIEvent.h"
+#include "Drivers/MIDI/MIDIDriverFactory.h"
+#include "MIDIDriver.h"
 
 #include <vector>
 #include <iostream>
@@ -192,6 +194,52 @@ int test_pitch_bend()
     return 0;
 }
 
+int test_driver_factory()
+{
+    MIDIDriverFactory const *factory = MIDIDriverFactory::getInstance();
+    MIDIDriverFactory::DriverDescriptionCollection const &descriptions = factory->getDriverDescriptions();
+    bool nullDriverAvailable = false;
+    bool alsaDriverAvailable = false;
+
+    for (DriverDescription const &description : descriptions)
+    {
+        if (description.getKey() == "null")
+        {
+            nullDriverAvailable = true;
+        }
+        else if (description.getKey() == "alsa")
+        {
+            alsaDriverAvailable = true;
+        }
+    }
+
+    if (!nullDriverAvailable)
+    {
+        return error;
+    }
+
+#ifdef ODE2JOY_HAVE_ALSA
+    if (!alsaDriverAvailable)
+    {
+        return error;
+    }
+#else
+    if (alsaDriverAvailable)
+    {
+        return error;
+    }
+#endif
+
+    MIDIDriver *nullDriver = factory->createDriver("null");
+    if (!nullDriver)
+    {
+        return error;
+    }
+    delete nullDriver;
+
+    return factory->createDriver("unknown") ? error : 0;
+}
+
 int main (int argc, char **argv)
 {
     if (argc == 2)
@@ -237,6 +285,10 @@ int main (int argc, char **argv)
         else if (testName == "test_pitch_bend")
         {
             errorCode = test_pitch_bend();
+        }
+        else if (testName == "test_driver_factory")
+        {
+            errorCode = test_driver_factory();
         }
 
         return errorCode;

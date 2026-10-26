@@ -21,18 +21,24 @@
 // Corresponding include file
 #include "MIDIDriverFactory.h"
 
+#ifdef ODE2JOY_HAVE_ALSA
 #include "MIDIDriverALSA.h"
+#endif
 #include "MIDIDriverNull.h"
 
 
 MIDIDriverFactory* MIDIDriverFactory::s_instance = 0;
 
+#ifdef ODE2JOY_HAVE_ALSA
 static std::string s_alsaKey("alsa");
+#endif
 static std::string s_nullKey("null");
 
 MIDIDriverFactory::MIDIDriverFactory()
 {
+#ifdef ODE2JOY_HAVE_ALSA
     m_driverDescriptions.push_back(DriverDescription(s_alsaKey, "Alsa sequencer"));
+#endif
     m_driverDescriptions.push_back(DriverDescription(s_nullKey, "Null driver"));
 }
 
@@ -59,10 +65,12 @@ MIDIDriverFactory::DriverDescriptionCollection const & MIDIDriverFactory::getDri
 
 MIDIDriver* MIDIDriverFactory::createDriver(std::string const & key) const
 {
+#ifdef ODE2JOY_HAVE_ALSA
     if (key == s_alsaKey)
     {
         return new MIDIDriverALSA();
     }
+#endif
 
     if (key == s_nullKey)
     {

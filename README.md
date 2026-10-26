@@ -1,9 +1,5 @@
 # ode2joy
 
-
-----------
-
-
 ## Introduction
 *ode2joy* is intended to become an application that translates joystick input to MIDI events.
 
@@ -23,72 +19,46 @@ The current implementation only maps joystick button events to hardcoded *note o
 An actual mapping and a configuration of the mapping via the graphical user interface is not implemented yet.
 
 ## Dependencies
-Currently *ode2joy* is dependent on the following libraries:
+The application requires the following development tools and libraries:
 
-* [Qt 4.8](http://qt-project.org/) (required)
-* ALSA (optional)
+* CMake 3.16 or newer
+* A C++17 compiler
+* Qt 6 Widgets
+* ALSA development files on Linux (optional; without them, only the Null MIDI driver is available)
 
 ## Getting involved in development
 Here are some tips if you want to get involved in the development of *ode2joy*.
 
-### Developing under Ubuntu 14.04 LTS
-Actually *ode2joy* is developed on an [Arch Linux](http://archlinux.org/) system. However, as [Ubuntu](http://www.ubuntu.com) is the more widely used distribution here are some pointers on how to get a develop environment running on a fresh install of Ubuntu 14.04 LTS.
+### Developing on Linux
+On Debian or Ubuntu, install the required packages with:
 
-#### Installation of Ubuntu 14.04 LTS
-If you do not have Ubuntu 14.04 LTS installed you will obviously need to install it first. In case you install it in VirtualBox you may want to install the guest additions as well. Issue the following command from within the virtual machine:
-> sudo apt-get install virtualbox-guest-x11
+```sh
+sudo apt install git build-essential cmake qt6-base-dev
+```
 
-#### Installation of the needed development tools
-The following development components are needed:
+To build the ALSA MIDI backend as well, install its development package:
 
-* git
-* g++
-* CMake
-* Qt4
-* ALSA
-
-You can install all these components at once with the following command:
-> sudo apt-get install git g++ cmake qt4-default libasound2-dev
+```sh
+sudo apt install libasound2-dev
+```
 
 #### Cloning of the repository
 Use the following command to clone the git repository:
 > git clone https://github.com/michaelgregorius/ode2joy.git
 
 #### Building the application from source
-Now we should be ready to compile everything with make. For the sake of simplicity we will assume that the repository was cloned into the home directory, i.e. there is a directory *~/ode2joy*. To compile the application follow these steps:
+From the repository root, configure, build, and run the tests with:
 
-1. Change the working directory to your home directory:
-> cd ~
+```sh
+cmake -S src -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
 
-2. Create a build directory:
-> mkdir ode2joy-build
-
-3. Change into the build directory:
-> cd ode2joy-build
-
-4. Run CMake (this step will create the *make* file):
-> cmake ../ode2joy/src
-
-5. Build the application:
-> make
-
-6. Start the application:
-> ./ode2joy 
-
-#### Developing with Qt Creator
-* Install Qt Creator:
-> sudo apt-get install qtcreator
-
-* Start Qt Creator, e.g. from a terminal.
-> qtcreator &
-
-* From the "Welcome" screen select "Open Project".
-* In the file dialog navigate to ~/ode2joy/src and select the file CMakeLists.txt.
-* CMake is now executed automatically.
-* Try to build the application, e.g. by pressing CTRL+B.
+Start the application with `./build/ode2joy`.
 
 ### Known caveats
-If you install Ubuntu 14.04 LTS in VirtualBox the mouse will be reported as device */dev/input/js0*. Currently this device is hard coded as the joystick in the kernel joystick driver found at *Drivers/Joystick/JoystickDriverLinux.cpp*. If you want to develop in VirtualBox you may need to change the device in this file to */dev/input/js1* or something similar.
+When developing in VirtualBox the mouse might be reported as device */dev/input/js0*. Currently this device is hard coded as the joystick in the kernel joystick driver found at *Drivers/Joystick/JoystickDriverLinux.cpp*. If you want to develop in VirtualBox you may need to change the device in this file to */dev/input/js1* or something similar.
 
 ## TODOs
 

@@ -26,9 +26,9 @@
 #include "Drivers/Joystick/JoystickDriverFactory.h"
 #include "Drivers/MIDI/MIDIDriverFactory.h"
 
+#include <QAction>
 #include <QMenuBar>
 #include <QMenu>
-#include <QGraphicsPathItem>
 #include <QMessageBox>
 
 #include <iostream>
@@ -46,11 +46,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QAction *newSessionAction = fileMenu->addAction(QMenu::tr("&New session"));
     newSessionAction->setShortcuts(QKeySequence::New);
-    QObject::connect(newSessionAction, SIGNAL(triggered()), SLOT(onActionNewSession()));
+    QObject::connect(newSessionAction, &QAction::triggered, this, &MainWindow::onActionNewSession);
 
     QAction *quitAction = fileMenu->addAction(QMenu::tr("&Quit"));
     quitAction->setShortcuts(QKeySequence::Quit);
-    QObject::connect(quitAction, SIGNAL(triggered()), SLOT(onActionQuit()));
+    QObject::connect(quitAction, &QAction::triggered, this, &MainWindow::onActionQuit);
 
     mainWindowMenuBar->addMenu(fileMenu);
 
@@ -67,7 +67,7 @@ MainWindow::MainWindow(QWidget *parent) :
     {
         QAction *joysticDriverAction = joystickDriverMenu->addAction(QString::fromStdString(d.getDescription()));
         joysticDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
-        QObject::connect(joysticDriverAction, SIGNAL(triggered()), SLOT(onActionJoystickDriverSelected()));
+        QObject::connect(joysticDriverAction, &QAction::triggered, this, &MainWindow::onActionJoystickDriverSelected);
     }
 
     // MIDI sub menu
@@ -80,7 +80,7 @@ MainWindow::MainWindow(QWidget *parent) :
     {
         QAction *midiDriverAction = midiDriverMenu->addAction(QString::fromStdString(d.getDescription()));
         midiDriverAction->setData(QVariant(QString::fromStdString(d.getKey())));
-        QObject::connect(midiDriverAction, SIGNAL(triggered()), SLOT(onActionMIDIDriverSelected()));
+        QObject::connect(midiDriverAction, &QAction::triggered, this, &MainWindow::onActionMIDIDriverSelected);
     }
 
     mainWindowMenuBar->addMenu(driverMenu);
@@ -91,7 +91,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QAction *aboutQtAction = helpMenu->addAction(QMenu::tr("About Qt..."));
     mainWindowMenuBar->addMenu(helpMenu);
 
-    QObject::connect(aboutQtAction, SIGNAL(triggered()), SLOT(onActionAboutQt()));
+    QObject::connect(aboutQtAction, &QAction::triggered, this, &MainWindow::onActionAboutQt);
 
     m_sessionWidget = new SessionWidget(this, m_session);
     setCentralWidget(m_sessionWidget);
