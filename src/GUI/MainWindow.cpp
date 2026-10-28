@@ -20,6 +20,7 @@
 #include "MainWindow.h"
 
 #include "DeviceListWidget.h"
+#include "MappingEditorDialog.h"
 #include "PipelineBridge.h"
 #include "ProfileStore.h"
 
@@ -27,7 +28,6 @@
 #include "core/SdlInput.h"
 
 #include <QAction>
-#include <QFileDialog>
 #include <QIcon>
 #include <QMenuBar>
 #include <QMenu>
@@ -48,21 +48,25 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QMenuBar *mainWindowMenuBar = this->menuBar();
     QMenu *fileMenu = new QMenu(QMenu::tr("&File"), mainWindowMenuBar);
-    fileMenu->addAction(QMenu::tr("&Load profile for device type..."), this, &MainWindow::onActionLoadTypeProfile);
-    fileMenu->addAction(QMenu::tr("Load profile for this &device only..."), this, &MainWindow::onActionLoadDeviceProfile);
-    fileMenu->addAction(QMenu::tr("&Save profile of selected device..."), this, &MainWindow::onActionSaveProfile);
-    fileMenu->addAction(QMenu::tr("&Reset to default profile"), this, &MainWindow::onActionResetProfile);
-    fileMenu->addSeparator();
     QAction *quitAction = fileMenu->addAction(QMenu::tr("&Quit"), this, &MainWindow::onActionQuit);
     quitAction->setShortcuts(QKeySequence::Quit);
     mainWindowMenuBar->addMenu(fileMenu);
+
+    QMenu *editMenu = new QMenu(QMenu::tr("&Edit"), mainWindowMenuBar);
+    QAction *editMappingsAction = editMenu->addAction(QMenu::tr("&Mapping presets..."), this, &MainWindow::onActionEditMappings);
+    editMappingsAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
+    mainWindowMenuBar->addMenu(editMenu);
 
     QMenu *helpMenu = new QMenu(QMenu::tr("&Help"), mainWindowMenuBar);
     helpMenu->addAction(QMenu::tr("About Qt..."), this, &MainWindow::onActionAboutQt);
     mainWindowMenuBar->addMenu(helpMenu);
 
     connect(m_bridge.get(), &PipelineBridge::deviceConnected, this,
-            [this](DeviceInfo info, QString profile) { m_deviceList->addDevice(info, profile); });
+            [this](DeviceInfo info, QString profile) {
+                m_deviceList->addDevice(info, profile);
+                m_store->ensureSaved(info.guid);
+                refreshPresetChoices();
+            });
     connect(m_bridge.get(), &PipelineBridge::deviceDisconnected, this,
             [this](quint32 id) { m_deviceList->removeDevice(id); });
     connect(m_bridge.get(), &PipelineBridge::deviceProfileChanged, this,
@@ -79,6 +83,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(m_deviceList, &DeviceListWidget::deviceEnabledChanged, this,
             [this](quint32 id, bool enabled) { m_pipeline->setDeviceEnabled(id, enabled); });
+    connect(m_deviceList, &DeviceListWidget::presetSelected, this, &MainWindow::onPresetSelected);
 
     std::string error;
     if (!m_pipeline->start(error))
@@ -94,96 +99,70 @@ MainWindow::~MainWindow()
     m_pipeline->stop();
 }
 
-void MainWindow::onActionLoadTypeProfile()
+void MainWindow::refreshPresetChoices()
 {
-    loadProfile(false);
+    for (DeviceInfo const &device : m_deviceList->devices())
+    {
+        TypeRecord record;
+        QStringList names;
+        if (m_library->getRecord(device.guid, record))
+        {
+            for (Profile const &p : record.presets)
+            {
+                names << QString::fromStdString(p.name);
+            }
+        }
+
+        QString current = QString::fromStdString(m_library->selectedPresetName(device));
+        if (current.isEmpty())
+        {
+            current = tr("Default");
+            names.clear();
+            names << current;
+        }
+
+        m_deviceList->setPresets(device.id, names, current);
+    }
 }
 
-void MainWindow::onActionLoadDeviceProfile()
-{
-    loadProfile(true);
-}
-
-void MainWindow::loadProfile(bool forThisDeviceOnly)
+void MainWindow::onPresetSelected(quint32 id, QString const &name)
 {
     DeviceInfo device;
-    if (!m_deviceList->selectedDevice(device))
-    {
-        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
-        return;
-    }
-
-    if (forThisDeviceOnly && device.serial.empty())
-    {
-        QMessageBox::information(this, tr("No serial number"),
-                                 tr("This joystick does not report a serial number, so a profile can only be assigned to its type."));
-        return;
-    }
-
-    QString const path = QFileDialog::getOpenFileName(this, tr("Load profile"), QString(), tr("Profiles (*.json)"));
-    if (path.isEmpty())
+    TypeRecord record;
+    if (!m_deviceList->device(id, device) || !m_library->getRecord(device.guid, record) || record.presets.empty())
     {
         return;
     }
 
-    Profile profile;
-    QString error;
-    if (!ProfileStore::readProfileFile(path, profile, error))
-    {
-        QMessageBox::warning(this, tr("Cannot load profile"), error);
-        return;
-    }
-
-    profile.deviceGuid = device.guid;
-    profile.deviceSerial = forThisDeviceOnly ? device.serial : std::string();
-
-    bool const saved = forThisDeviceOnly ? m_store->saveInstanceProfile(profile, error)
-                                         : m_store->saveTypeProfile(profile, error);
-    if (!saved)
-    {
-        QMessageBox::warning(this, tr("Cannot store profile"), error);
-    }
-
-    m_pipeline->reloadProfiles();
-}
-
-void MainWindow::onActionSaveProfile()
-{
-    DeviceInfo device;
-    if (!m_deviceList->selectedDevice(device))
-    {
-        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
-        return;
-    }
-
-    QString const path = QFileDialog::getSaveFileName(this, tr("Save profile"), QString(), tr("Profiles (*.json)"));
-    if (path.isEmpty())
-    {
-        return;
-    }
-
-    QString error;
-    if (!ProfileStore::writeProfileFile(path, m_library->resolve(device), error))
-    {
-        QMessageBox::warning(this, tr("Cannot save profile"), error);
-    }
-}
-
-void MainWindow::onActionResetProfile()
-{
-    DeviceInfo device;
-    if (!m_deviceList->selectedDevice(device))
-    {
-        QMessageBox::information(this, tr("No joystick selected"), tr("Please select a joystick first."));
-        return;
-    }
-
+    // Devices that report a serial number get their own choice; others share the type's active preset.
     if (!device.serial.empty())
     {
-        m_store->removeInstanceProfile(device.guid, device.serial);
+        m_library->setInstancePreset(device.guid, device.serial, name.toStdString());
     }
-    m_store->removeTypeProfile(device.guid);
+    else
+    {
+        record.activePreset = name.toStdString();
+        m_library->setRecord(record);
+    }
+
+    QString error;
+    if (!m_store->save(device.guid, error))
+    {
+        statusBar()->showMessage(error, 10000);
+    }
+
     m_pipeline->reloadProfiles();
+}
+
+void MainWindow::onActionEditMappings()
+{
+    DeviceInfo device;
+    std::string const guid = m_deviceList->selectedDevice(device) ? device.guid : std::string();
+
+    MappingEditorDialog dialog(m_library, *m_store, [this]() { m_pipeline->reloadProfiles(); }, guid, this);
+    dialog.exec();
+
+    refreshPresetChoices();
 }
 
 void MainWindow::onActionQuit()

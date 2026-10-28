@@ -61,6 +61,27 @@ float smoothStep(float current, float target, float dtSeconds, float timeConstan
     return current + alpha * (target - current);
 }
 
+float shapeAxis(Mapping const &m, float raw)
+{
+    if (m.range == AxisRange::Unipolar)
+    {
+        float y = clampf((raw + 1.0f) * 0.5f, 0.0f, 1.0f);
+        if (m.invert)
+        {
+            y = 1.0f - y;
+        }
+        return applyCurve(applyUnipolarDeadZone(y, m.deadZone), m.curve);
+    }
+
+    float y = clampf(raw, -1.0f, 1.0f);
+    if (m.invert)
+    {
+        y = -y;
+    }
+    y = applyCurve(applyDeadZone(y, m.deadZone), m.curve);
+    return (y + 1.0f) * 0.5f;
+}
+
 uint8_t quantize7(float x01)
 {
     return static_cast<uint8_t>(std::lround(clampf(x01, 0.0f, 1.0f) * 127.0f));

@@ -8,7 +8,10 @@
 
 QJsonObject profileToJson(Profile const &profile);
 
-// Returns false and sets error if the document is not a valid profile.
+// Returns false and sets error if the document is not a valid preset.
 bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error);
+
+QJsonObject recordToJson(TypeRecord const &record);
+bool recordFromJson(QJsonObject const &json, TypeRecord &record, QString &error);
 
 #endif /* PROFILEJSON_H_ */

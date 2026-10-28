@@ -50,7 +50,11 @@ private:
     {
         Profile profile;
         std::vector<MappingState> states;
+        std::map<int, float> rawAxes;
     };
+
+    static Stick const *radialStick(Profile const &profile, int axis);
+    static float effectiveAxis(DeviceState const &device, int axis);
 
     void processAxis(Mapping const &mapping, MappingState &state, float raw, uint64_t time, Events &out);
     void advance(Mapping const &mapping, MappingState &state, uint64_t time, Events &out);

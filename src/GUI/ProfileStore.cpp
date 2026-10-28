@@ -13,84 +13,28 @@
 namespace
 {
 
-// Device-provided strings must not be able to escape the profile directory.
-QString sanitize(std::string const &s)
+bool writeJson(QString const &path, QJsonObject const &object, QString &error)
 {
-    return QString::fromStdString(s).replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
-}
+    QDir().mkpath(QFileInfo(path).absolutePath());
 
-} // namespace
-
-ProfileStore::ProfileStore(ProfileLibrary &library) :
-    m_library(library)
-{
-}
-
-QString ProfileStore::directory() const
-{
-    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/profiles";
-}
-
-QString ProfileStore::typePath(std::string const &guid) const
-{
-    return directory() + "/type-" + sanitize(guid) + ".json";
-}
-
-QString ProfileStore::instancePath(std::string const &guid, std::string const &serial) const
-{
-    return directory() + "/device-" + sanitize(guid) + "-" + sanitize(serial) + ".json";
-}
-
-void ProfileStore::load()
-{
-    QDir dir(directory());
-    for (QFileInfo const &file : dir.entryInfoList(QStringList() << "*.json", QDir::Files))
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
     {
-        Profile p;
-        QString error;
-        if (!readProfileFile(file.absoluteFilePath(), p, error) || p.deviceGuid.empty())
-        {
-            continue;
-        }
-
-        if (p.deviceSerial.empty())
-        {
-            m_library.setTypeProfile(p.deviceGuid, p);
-        }
-        else
-        {
-            m_library.setInstanceProfile(p.deviceGuid, p.deviceSerial, p);
-        }
+        error = file.errorString();
+        return false;
     }
+
+    file.write(QJsonDocument(object).toJson());
+    if (!file.commit())
+    {
+        error = file.errorString();
+        return false;
+    }
+
+    return true;
 }
 
-bool ProfileStore::saveTypeProfile(Profile const &profile, QString &error)
-{
-    Profile p = profile;
-    p.deviceSerial.clear();
-    m_library.setTypeProfile(p.deviceGuid, p);
-    return writeProfileFile(typePath(p.deviceGuid), p, error);
-}
-
-bool ProfileStore::saveInstanceProfile(Profile const &profile, QString &error)
-{
-    m_library.setInstanceProfile(profile.deviceGuid, profile.deviceSerial, profile);
-    return writeProfileFile(instancePath(profile.deviceGuid, profile.deviceSerial), profile, error);
-}
-
-void ProfileStore::removeTypeProfile(std::string const &guid)
-{
-    m_library.clearTypeProfile(guid);
-    QFile::remove(typePath(guid));
-}
-
-void ProfileStore::removeInstanceProfile(std::string const &guid, std::string const &serial)
-{
-    m_library.clearInstanceProfile(guid, serial);
-    QFile::remove(instancePath(guid, serial));
-}
-
-bool ProfileStore::readProfileFile(QString const &path, Profile &profile, QString &error)
+bool readJson(QString const &path, QJsonObject &object, QString &error)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly))
@@ -107,26 +51,72 @@ bool ProfileStore::readProfileFile(QString const &path, Profile &profile, QStrin
         return false;
     }
 
-    return profileFromJson(doc.object(), profile, error);
+    object = doc.object();
+    return true;
+}
+
+} // namespace
+
+ProfileStore::ProfileStore(ProfileLibrary &library) :
+    m_library(library)
+{
+}
+
+QString ProfileStore::directory() const
+{
+    return QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + "/types";
+}
+
+QString ProfileStore::pathFor(std::string const &guid) const
+{
+    // Device-provided strings must not be able to escape the config directory.
+    QString const safe = QString::fromStdString(guid).replace(QRegularExpression("[^A-Za-z0-9_-]"), "_");
+    return directory() + "/" + safe + ".json";
+}
+
+void ProfileStore::load()
+{
+    QDir dir(directory());
+    for (QFileInfo const &file : dir.entryInfoList(QStringList() << "*.json", QDir::Files))
+    {
+        QJsonObject json;
+        TypeRecord record;
+        QString error;
+        if (readJson(file.absoluteFilePath(), json, error) && recordFromJson(json, record, error))
+        {
+            m_library.setRecord(record);
+        }
+    }
+}
+
+bool ProfileStore::save(std::string const &guid, QString &error)
+{
+    TypeRecord record;
+    if (!m_library.getRecord(guid, record))
+    {
+        error = QObject::tr("Unknown joystick type");
+        return false;
+    }
+
+    return writeJson(pathFor(guid), recordToJson(record), error);
+}
+
+void ProfileStore::ensureSaved(std::string const &guid)
+{
+    if (!QFileInfo::exists(pathFor(guid)))
+    {
+        QString error;
+        save(guid, error);
+    }
+}
+
+bool ProfileStore::readProfileFile(QString const &path, Profile &profile, QString &error)
+{
+    QJsonObject json;
+    return readJson(path, json, error) && profileFromJson(json, profile, error);
 }
 
 bool ProfileStore::writeProfileFile(QString const &path, Profile const &profile, QString &error)
 {
-    QDir().mkpath(QFileInfo(path).absolutePath());
-
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly))
-    {
-        error = file.errorString();
-        return false;
-    }
-
-    file.write(QJsonDocument(profileToJson(profile)).toJson());
-    if (!file.commit())
-    {
-        error = file.errorString();
-        return false;
-    }
-
-    return true;
+    return writeJson(path, profileToJson(profile), error);
 }

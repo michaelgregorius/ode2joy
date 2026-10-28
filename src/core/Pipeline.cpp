@@ -182,6 +182,8 @@ void Pipeline::onDeviceAdded(DeviceInfo const &info)
     device.info = info;
     device.enabled = true;
 
+    m_library->registerType(deviceTypeOf(info));
+
     std::string error;
     device.output = m_outputFactory(info, error);
     if (!device.output && m_listener)

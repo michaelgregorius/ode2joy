@@ -3,6 +3,7 @@
 #include "Processing.h"
 
 #include <cmath>
+#include <algorithm>
 
 namespace
 {
@@ -60,6 +61,44 @@ int quantizeFor(MidiTarget const &target, float x01)
 
 } // namespace
 
+Stick const *MappingEngine::radialStick(Profile const &profile, int axis)
+{
+    for (Stick const &s : profile.sticks)
+    {
+        if (s.radialDeadZone > 0.0f && (s.xAxis == axis || s.yAxis == axis))
+        {
+            return &s;
+        }
+    }
+    return nullptr;
+}
+
+float MappingEngine::effectiveAxis(DeviceState const &device, int axis)
+{
+    auto raw = [&device](int i) {
+        auto it = device.rawAxes.find(i);
+        return it == device.rawAxes.end() ? 0.0f : it->second;
+    };
+
+    Stick const *stick = radialStick(device.profile, axis);
+    if (!stick)
+    {
+        return raw(axis);
+    }
+
+    float const x = raw(stick->xAxis);
+    float const y = raw(stick->yAxis);
+    float const r = std::hypot(x, y);
+    float const dz = clampf(stick->radialDeadZone, 0.0f, 0.99f);
+    if (r <= dz)
+    {
+        return 0.0f;
+    }
+
+    float const scaled = std::min(1.0f, (r - dz) / (1.0f - dz));
+    return raw(axis) * scaled / r;
+}
+
 void MappingEngine::setProfile(DeviceId device, Profile const &profile, Events &out)
 {
     releaseAll(device, out);
@@ -108,10 +147,29 @@ void MappingEngine::processEvent(ControlEvent const &event, Events &out)
     }
 
     DeviceState &device = it->second;
+
+    // A radial dead zone couples both axes of a stick, so the partner axis is re-evaluated too.
+    int partnerAxis = -1;
+    if (event.type == ControlType::Axis)
+    {
+        device.rawAxes[event.index] = event.value;
+        Stick const *stick = radialStick(device.profile, event.index);
+        if (stick)
+        {
+            partnerAxis = stick->xAxis == event.index ? stick->yAxis : stick->xAxis;
+        }
+    }
+
     for (size_t i = 0; i < device.profile.mappings.size(); ++i)
     {
         Mapping const &m = device.profile.mappings[i];
-        if (m.source.type != event.type || m.source.index != event.index)
+        bool matches = m.source.type == event.type && m.source.index == event.index;
+        if (!matches && event.type == ControlType::Axis && m.source.type == ControlType::Axis
+            && m.source.index == partnerAxis)
+        {
+            matches = true;
+        }
+        if (!matches)
         {
             continue;
         }
@@ -123,7 +181,7 @@ void MappingEngine::processEvent(ControlEvent const &event, Events &out)
         case ControlType::Axis:
             if (isContinuous(m.target.kind))
             {
-                processAxis(m, s, event.value, event.timestamp, out);
+                processAxis(m, s, effectiveAxis(device, m.source.index), event.timestamp, out);
             }
             break;
 
@@ -173,28 +231,7 @@ void MappingEngine::processEvent(ControlEvent const &event, Events &out)
 
 void MappingEngine::processAxis(Mapping const &m, MappingState &s, float raw, uint64_t time, Events &out)
 {
-    float y;
-    if (m.range == AxisRange::Unipolar)
-    {
-        y = clampf((raw + 1.0f) * 0.5f, 0.0f, 1.0f);
-        if (m.invert)
-        {
-            y = 1.0f - y;
-        }
-        y = applyUnipolarDeadZone(y, m.deadZone);
-        y = applyCurve(y, m.curve);
-    }
-    else
-    {
-        y = clampf(raw, -1.0f, 1.0f);
-        if (m.invert)
-        {
-            y = -y;
-        }
-        y = applyDeadZone(y, m.deadZone);
-        y = applyCurve(y, m.curve);
-        y = (y + 1.0f) * 0.5f;
-    }
+    float const y = shapeAxis(m, raw);
 
     s.target = y;
     if (!s.initialized)

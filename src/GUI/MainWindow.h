@@ -39,15 +39,13 @@ public:
     virtual ~MainWindow();
 
 private slots:
-    void onActionLoadTypeProfile();
-    void onActionLoadDeviceProfile();
-    void onActionSaveProfile();
-    void onActionResetProfile();
+    void onActionEditMappings();
     void onActionQuit();
     void onActionAboutQt();
+    void onPresetSelected(quint32 id, QString const &name);
 
 private:
-    void loadProfile(bool forThisDeviceOnly);
+    void refreshPresetChoices();
 
 private:
     std::shared_ptr<ProfileLibrary> m_library;

@@ -1,6 +1,7 @@
 #include "DeviceListWidget.h"
 
 #include <QBrush>
+#include <QComboBox>
 #include <QHeaderView>
 
 namespace
@@ -13,7 +14,7 @@ int const flashDurationMs = 150;
 DeviceListWidget::DeviceListWidget(QWidget *parent) :
     QTableWidget(0, ColCount, parent)
 {
-    setHorizontalHeaderLabels(QStringList() << tr("Enabled") << tr("Joystick") << tr("Profile") << tr("Activity"));
+    setHorizontalHeaderLabels(QStringList() << tr("Enabled") << tr("Joystick") << tr("Preset") << tr("Activity"));
     horizontalHeader()->setSectionResizeMode(ColName, QHeaderView::Stretch);
     horizontalHeader()->setSectionResizeMode(ColProfile, QHeaderView::ResizeToContents);
     verticalHeader()->hide();
@@ -39,7 +40,7 @@ int DeviceListWidget::rowOf(DeviceId id) const
     return -1;
 }
 
-void DeviceListWidget::addDevice(DeviceInfo const &info, QString const &profileName)
+void DeviceListWidget::addDevice(DeviceInfo const &info, QString const &presetName)
 {
     if (rowOf(info.id) >= 0)
     {
@@ -67,9 +68,13 @@ void DeviceListWidget::addDevice(DeviceInfo const &info, QString const &profileN
     name->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
     setItem(row, ColName, name);
 
-    QTableWidgetItem *profile = new QTableWidgetItem(profileName);
-    profile->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-    setItem(row, ColProfile, profile);
+    QComboBox *combo = new QComboBox();
+    combo->addItem(presetName);
+    DeviceId const id = info.id;
+    connect(combo, &QComboBox::textActivated, this, [this, id](QString const &text) {
+        emit presetSelected(id, text);
+    });
+    setCellWidget(row, ColProfile, combo);
 
     QTableWidgetItem *activity = new QTableWidgetItem();
     activity->setFlags(Qt::ItemIsEnabled);
@@ -89,13 +94,38 @@ void DeviceListWidget::removeDevice(DeviceId id)
     m_lastActivity.remove(id);
 }
 
-void DeviceListWidget::setProfileName(DeviceId id, QString const &profileName)
+void DeviceListWidget::setProfileName(DeviceId id, QString const &presetName)
 {
     int const row = rowOf(id);
-    if (row >= 0)
+    QComboBox *combo = row >= 0 ? qobject_cast<QComboBox *>(cellWidget(row, ColProfile)) : nullptr;
+    if (!combo)
     {
-        item(row, ColProfile)->setText(profileName);
+        return;
     }
+
+    QSignalBlocker blocker(combo);
+    int index = combo->findText(presetName);
+    if (index < 0)
+    {
+        combo->addItem(presetName);
+        index = combo->count() - 1;
+    }
+    combo->setCurrentIndex(index);
+}
+
+void DeviceListWidget::setPresets(DeviceId id, QStringList const &names, QString const &current)
+{
+    int const row = rowOf(id);
+    QComboBox *combo = row >= 0 ? qobject_cast<QComboBox *>(cellWidget(row, ColProfile)) : nullptr;
+    if (!combo)
+    {
+        return;
+    }
+
+    QSignalBlocker blocker(combo);
+    combo->clear();
+    combo->addItems(names);
+    setProfileName(id, current);
 }
 
 void DeviceListWidget::flashActivity(DeviceId id)
@@ -151,7 +181,16 @@ bool DeviceListWidget::selectedDevice(DeviceInfo &info) const
         return false;
     }
 
-    DeviceId const id = item(row, ColName)->data(Qt::UserRole).toUInt();
+    return device(item(row, ColName)->data(Qt::UserRole).toUInt(), info);
+}
+
+QList<DeviceInfo> DeviceListWidget::devices() const
+{
+    return m_devices.values();
+}
+
+bool DeviceListWidget::device(DeviceId id, DeviceInfo &info) const
+{
     auto it = m_devices.find(id);
     if (it == m_devices.end())
     {

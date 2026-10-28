@@ -24,10 +24,15 @@ SDL3 input -> normalized ControlEvents -> mapping engine -> MIDI events -> RtMid
 
 The mapping engine supports axes, buttons, hats and pedals/triggers (unipolar axes) with inversion, dead zone, linear/exponential/logarithmic curves, smoothing, rate limiting and suppression of unchanged MIDI values. Buttons mapped to notes are tracked, so held notes get a *note off* when the joystick is unplugged or disabled. Targets are control change, note, pitch bend, program change and channel aftertouch.
 
-Without a profile a joystick uses a default mapping: buttons to notes starting at 36, axes to CC 16 and up, hat X/Y to CC 80 and up.
+Without a preset a joystick uses a default mapping: buttons to notes starting at 36, axes to CC 16 and up, hat X/Y to CC 80 and up.
 
-### Profiles
-Profiles are JSON files. Use *File > Save profile of selected device...* to export the active profile as a starting point, edit it by hand and load it again. A profile is assigned either to the joystick type (SDL GUID) or, if the joystick reports a serial number, to that single device. Profiles are stored in the application config directory (`~/.config/ode2joy/profiles` on Linux). A graphical mapping editor is not implemented yet.
+### Mapping presets
+Open *Edit > Mapping presets...* (Ctrl+M) to edit the mappings. The editor lists every joystick type seen so far; each type can have several presets, one of which is active. For the selected preset every axis, button and hat direction of the joystick is listed and can be mapped to a MIDI message (control change, note, pitch bend, program change or channel aftertouch) with channel and number. Axes additionally offer invert, centered or single-direction range, linear/exponential/logarithmic curves with a live preview, dead zone, smoothing and a message rate cap. Controls can be given custom labels.
+
+On the *Sticks* tab two axes can be grouped as an analog stick, which allows a radial dead zone and copying the response settings from the X to the Y axis. Each axis still maps to its own controller, so X and Y can send different CCs.
+
+Changes are applied to the running joysticks immediately and written to disk on OK; Cancel reverts them. Presets can be imported and exported as JSON files. The preset used by a joystick is chosen in the device list: joysticks that report a serial number get their own choice, all others share the active preset of their type. Data is stored in the application config directory (`~/.config/ode2joy/types` on Linux).
+
 
 ## Dependencies
 The application requires the following development tools and libraries:
@@ -68,7 +73,7 @@ Start the application with `./build/ode2joy`.
 
 ## TODOs
 
-* Implement GUI to edit the mappings, including MIDI learn
+* MIDI learn for the mapping editor
 * Show the live values of the controls in the GUI
 * Windows support for MIDI output (no virtual ports in RtMidi)
 

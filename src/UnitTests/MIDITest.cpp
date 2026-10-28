@@ -704,35 +704,172 @@ int test_profile_library_resolution()
     ProfileLibrary library;
     DeviceInfo info;
     info.guid = "g";
+    info.name = "Pad";
     info.serial = "s1";
+    info.numAxes = 2;
 
-    if (library.resolve(info).name != "Default")
+    // Unknown type: built-in default.
+    if (library.resolve(info).name != "Default" || !library.selectedPresetName(info).empty())
     {
         return error;
     }
 
-    Profile type;
-    type.name = "Type";
-    library.setTypeProfile("g", type);
-    if (library.resolve(info).name != "Type")
+    if (!library.registerType(deviceTypeOf(info)) || library.registerType(deviceTypeOf(info)))
     {
         return error;
     }
 
-    Profile instance;
-    instance.name = "Instance";
-    library.setInstanceProfile("g", "s1", instance);
-    if (library.resolve(info).name != "Instance")
+    TypeRecord record;
+    if (!library.getRecord("g", record) || record.type.numAxes != 2)
     {
         return error;
     }
 
+    Profile a;
+    a.name = "A";
+    Profile b;
+    b.name = "B";
+    record.presets = { a, b };
+    record.activePreset = "B";
+    library.setRecord(record);
+
+    if (library.resolve(info).name != "B")
+    {
+        return error;
+    }
+
+    library.setInstancePreset("g", "s1", "A");
+    if (library.resolve(info).name != "A" || library.selectedPresetName(info) != "A")
+    {
+        return error;
+    }
+
+    // Other physical devices of the type keep the active preset.
     info.serial = "s2";
-    if (library.resolve(info).name != "Type")
+    if (library.resolve(info).name != "B")
     {
         return error;
     }
 
+    // An unknown preset name falls back to the first preset.
+    record.activePreset = "gone";
+    library.setRecord(record);
+    return library.resolve(info).name == "A" ? 0 : error;
+}
+
+int test_default_profile_axes()
+{
+    DeviceType type;
+    type.guid = "g";
+    type.numAxes = 4;
+    type.numButtons = 2;
+    type.numHats = 1;
+
+    Profile p = makeDefaultProfile(type);
+    if (p.sticks.size() != 2 || p.sticks[0].xAxis != 0 || p.sticks[0].yAxis != 1)
+    {
+        return error;
+    }
+
+    // Every axis gets its own controller.
+    std::map<int, int> controllers;
+    for (Mapping const &m : p.mappings)
+    {
+        if (m.source.type == ControlType::Axis)
+        {
+            ++controllers[m.target.number];
+        }
+    }
+    return controllers.size() == 4 ? 0 : error;
+}
+
+int test_shape_axis()
+{
+    Mapping m;
+    m.deadZone = 0.1f;
+    m.invert = true;
+    m.curve = { CurveType::Exponential, 3.0f };
+
+    if (!near(shapeAxis(m, 0.0f), 0.5f) || !near(shapeAxis(m, 1.0f), 0.0f) || !near(shapeAxis(m, -1.0f), 1.0f))
+    {
+        return error;
+    }
+
+    m.range = AxisRange::Unipolar;
+    m.invert = false;
+    m.deadZone = 0.0f;
+    m.curve = Curve();
+    return (near(shapeAxis(m, -1.0f), 0.0f) && near(shapeAxis(m, 1.0f), 1.0f)) ? 0 : error;
+}
+
+int test_x_and_y_use_different_ccs()
+{
+    MappingEngine engine;
+    install(engine, { axisToCC(0, 20), axisToCC(1, 21) });
+
+    MappingEngine::Events out = run(engine, ev(ControlType::Axis, 0, 1.0f, 0));
+    if (out.size() != 1 || out[0].getController() != 20)
+    {
+        return error;
+    }
+
+    out = run(engine, ev(ControlType::Axis, 1, 1.0f, ms));
+    return (out.size() == 1 && out[0].getController() == 21) ? 0 : error;
+}
+
+int test_radial_dead_zone()
+{
+    Profile p;
+    p.mappings = { axisToCC(0, 20), axisToCC(1, 21) };
+    Stick s;
+    s.xAxis = 0;
+    s.yAxis = 1;
+    s.radialDeadZone = 0.3f;
+    p.sticks.push_back(s);
+
+    MappingEngine engine;
+    MappingEngine::Events out;
+    engine.setProfile(dev, p, out);
+
+    // Each axis is below 0.3, but the diagonal radius 0.35 exceeds the dead zone.
+    out = run(engine, ev(ControlType::Axis, 0, 0.0f, 0));
+    out = run(engine, ev(ControlType::Axis, 1, 0.0f, 0));
+    out = run(engine, ev(ControlType::Axis, 0, 0.25f, ms));
+    int sent = 0;
+    for (MIDIEvent const &e : out)
+    {
+        if (e.getControllerValue() != 64)
+        {
+            return error; // Inside the dead zone: still centered
+        }
+        ++sent;
+    }
+    (void) sent;
+
+    out = run(engine, ev(ControlType::Axis, 1, 0.25f, 2 * ms));
+    bool xMoved = false;
+    for (MIDIEvent const &e : out)
+    {
+        if (e.getController() == 20 && e.getControllerValue() > 64)
+        {
+            xMoved = true; // The partner axis was re-evaluated when Y moved
+        }
+    }
+    if (!xMoved)
+    {
+        return error;
+    }
+
+    // Full deflection reaches the full range.
+    out = run(engine, ev(ControlType::Axis, 0, 1.0f, 3 * ms));
+    out = run(engine, ev(ControlType::Axis, 1, 0.0f, 4 * ms));
+    for (MIDIEvent const &e : out)
+    {
+        if (e.getController() == 20 && e.getControllerValue() != 127)
+        {
+            return error;
+        }
+    }
     return 0;
 }
 
@@ -763,7 +900,11 @@ int main (int argc, char **argv)
         { "test_release_on_remove", test_release_on_remove },
         { "test_hat_mappings", test_hat_mappings },
         { "test_pipeline_disconnect_releases_notes", test_pipeline_disconnect_releases_notes },
-        { "test_profile_library_resolution", test_profile_library_resolution }
+        { "test_profile_library_resolution", test_profile_library_resolution },
+        { "test_default_profile_axes", test_default_profile_axes },
+        { "test_shape_axis", test_shape_axis },
+        { "test_x_and_y_use_different_ccs", test_x_and_y_use_different_ccs },
+        { "test_radial_dead_zone", test_radial_dead_zone }
     };
 
     if (argc == 2)

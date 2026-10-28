@@ -42,16 +42,20 @@ endif()
 
 # Define GUI classes
 set (QT_GUI_HEADERS
+  GUI/CurvePreview.h
   GUI/DeviceListWidget.h
   GUI/MainWindow.h
+  GUI/MappingEditorDialog.h
   GUI/PipelineBridge.h
   GUI/ProfileJson.h
   GUI/ProfileStore.h
 )
 
 set (QT_GUI_SRCS
+  GUI/CurvePreview.cpp
   GUI/DeviceListWidget.cpp
   GUI/MainWindow.cpp
+  GUI/MappingEditorDialog.cpp
   GUI/PipelineBridge.cpp
   GUI/ProfileJson.cpp
   GUI/ProfileStore.cpp
@@ -128,8 +132,18 @@ set(ODE2JOY_TESTS
   test_hat_mappings
   test_pipeline_disconnect_releases_notes
   test_profile_library_resolution
+  test_default_profile_axes
+  test_shape_axis
+  test_x_and_y_use_different_ccs
+  test_radial_dead_zone
 )
 
 foreach(t ${ODE2JOY_TESTS})
   add_test(NAME ${t} COMMAND MIDITest ${t})
 endforeach()
+
+add_executable(ProfileJsonTest UnitTests/ProfileJsonTest.cpp GUI/ProfileJson.cpp)
+target_include_directories(ProfileJsonTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(ProfileJsonTest PRIVATE ode2joy_core Qt6::Core)
+add_test(NAME test_json_round_trip COMMAND ProfileJsonTest test_json_round_trip)
+add_test(NAME test_json_rejects_invalid COMMAND ProfileJsonTest test_json_rejects_invalid)

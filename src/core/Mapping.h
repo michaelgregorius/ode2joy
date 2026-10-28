@@ -4,6 +4,7 @@
 #include "ControlEvent.h"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -62,12 +63,48 @@ struct Mapping
     float maxRateHz = 250.0f; // Upper bound for messages per second; 0 disables
 };
 
+// Two axes that form an analog stick. The radial dead zone is applied to the pair, not per axis.
+struct Stick
+{
+    std::string label;
+    int xAxis = 0;
+    int yAxis = 1;
+    float radialDeadZone = 0.0f; // 0 disables
+};
+
+struct ControlLabel
+{
+    ControlType type = ControlType::Axis;
+    int index = 0;
+    std::string text;
+};
+
+// A preset. Controls without a mapping are unmapped.
 struct Profile
 {
     std::string name;
     std::string deviceGuid;
-    std::string deviceSerial; // Non-empty: applies only to this physical device
     std::vector<Mapping> mappings;
+    std::vector<Stick> sticks;
+    std::vector<ControlLabel> labels;
+};
+
+struct DeviceType
+{
+    std::string guid;
+    std::string name;
+    int numAxes = 0;
+    int numButtons = 0;
+    int numHats = 0;
+};
+
+// Everything known about one joystick type.
+struct TypeRecord
+{
+    DeviceType type;
+    std::vector<Profile> presets;
+    std::string activePreset;
+    std::map<std::string, std::string> instancePresets; // serial -> preset name
 };
 
 #endif

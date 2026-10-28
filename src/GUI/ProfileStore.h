@@ -5,7 +5,7 @@
 
 #include <QString>
 
-// Persists the profiles of a ProfileLibrary as JSON files in the application config directory.
+// Persists the type records of a ProfileLibrary as one JSON file each in the application config directory.
 class ProfileStore
 {
 public:
@@ -13,18 +13,17 @@ public:
 
     void load();
 
-    bool saveTypeProfile(Profile const &profile, QString &error);
-    bool saveInstanceProfile(Profile const &profile, QString &error);
-    void removeTypeProfile(std::string const &guid);
-    void removeInstanceProfile(std::string const &guid, std::string const &serial);
+    // Writes the library's record of the type; returns false and sets error on failure.
+    bool save(std::string const &guid, QString &error);
+    // Writes the record only if no file exists yet.
+    void ensureSaved(std::string const &guid);
 
     static bool readProfileFile(QString const &path, Profile &profile, QString &error);
     static bool writeProfileFile(QString const &path, Profile const &profile, QString &error);
 
 private:
     QString directory() const;
-    QString typePath(std::string const &guid) const;
-    QString instancePath(std::string const &guid, std::string const &serial) const;
+    QString pathFor(std::string const &guid) const;
 
     ProfileLibrary &m_library;
 };

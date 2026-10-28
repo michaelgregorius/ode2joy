@@ -8,7 +8,7 @@
 namespace
 {
 
-int const profileVersion = 1;
+int const fileVersion = 2;
 
 template <typename E>
 struct Name
@@ -64,6 +64,11 @@ uint8_t clampByte(int v)
     return static_cast<uint8_t>(std::max(0, std::min(127, v)));
 }
 
+QString str(std::string const &s)
+{
+    return QString::fromStdString(s);
+}
+
 } // namespace
 
 QJsonObject profileToJson(Profile const &profile)
@@ -102,18 +107,40 @@ QJsonObject profileToJson(Profile const &profile)
         mappings.append(o);
     }
 
+    QJsonArray sticks;
+    for (Stick const &s : profile.sticks)
+    {
+        QJsonObject o;
+        o["label"] = str(s.label);
+        o["xAxis"] = s.xAxis;
+        o["yAxis"] = s.yAxis;
+        o["radialDeadZone"] = s.radialDeadZone;
+        sticks.append(o);
+    }
+
+    QJsonArray labels;
+    for (ControlLabel const &l : profile.labels)
+    {
+        QJsonObject o;
+        o["type"] = toName(controlTypes, l.type);
+        o["index"] = l.index;
+        o["text"] = str(l.text);
+        labels.append(o);
+    }
+
     QJsonObject root;
-    root["version"] = profileVersion;
-    root["name"] = QString::fromStdString(profile.name);
-    root["deviceGuid"] = QString::fromStdString(profile.deviceGuid);
-    root["deviceSerial"] = QString::fromStdString(profile.deviceSerial);
+    root["version"] = fileVersion;
+    root["name"] = str(profile.name);
+    root["deviceGuid"] = str(profile.deviceGuid);
     root["mappings"] = mappings;
+    root["sticks"] = sticks;
+    root["labels"] = labels;
     return root;
 }
 
 bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error)
 {
-    if (json["version"].toInt() != profileVersion)
+    if (json["version"].toInt() != fileVersion)
     {
         error = QObject::tr("Unsupported profile version");
         return false;
@@ -122,7 +149,6 @@ bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error)
     Profile p;
     p.name = json["name"].toString().toStdString();
     p.deviceGuid = json["deviceGuid"].toString().toStdString();
-    p.deviceSerial = json["deviceSerial"].toString().toStdString();
 
     QJsonArray const mappings = json["mappings"].toArray();
     for (int i = 0; i < mappings.size(); ++i)
@@ -140,7 +166,7 @@ bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error)
             return false;
         }
 
-        m.source.index = source["index"].toInt();
+        m.source.index = std::max(0, source["index"].toInt());
         if (m.source.type == ControlType::Hat
             && !fromName(hatComponents, source["component"].toString(), m.hatComponent))
         {
@@ -164,6 +190,103 @@ bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error)
         p.mappings.push_back(m);
     }
 
+    for (QJsonValue const v : json["sticks"].toArray())
+    {
+        QJsonObject const o = v.toObject();
+        Stick s;
+        s.label = o["label"].toString().toStdString();
+        s.xAxis = std::max(0, o["xAxis"].toInt());
+        s.yAxis = std::max(0, o["yAxis"].toInt(1));
+        s.radialDeadZone = static_cast<float>(std::max(0.0, std::min(0.99, o["radialDeadZone"].toDouble())));
+        p.sticks.push_back(s);
+    }
+
+    for (QJsonValue const v : json["labels"].toArray())
+    {
+        QJsonObject const o = v.toObject();
+        ControlLabel l;
+        if (fromName(controlTypes, o["type"].toString(), l.type))
+        {
+            l.index = std::max(0, o["index"].toInt());
+            l.text = o["text"].toString().toStdString();
+            p.labels.push_back(l);
+        }
+    }
+
     profile = p;
+    return true;
+}
+
+QJsonObject recordToJson(TypeRecord const &record)
+{
+    QJsonObject type;
+    type["guid"] = str(record.type.guid);
+    type["name"] = str(record.type.name);
+    type["numAxes"] = record.type.numAxes;
+    type["numButtons"] = record.type.numButtons;
+    type["numHats"] = record.type.numHats;
+
+    QJsonArray presets;
+    for (Profile const &p : record.presets)
+    {
+        presets.append(profileToJson(p));
+    }
+
+    QJsonObject instances;
+    for (auto const &entry : record.instancePresets)
+    {
+        instances[str(entry.first)] = str(entry.second);
+    }
+
+    QJsonObject root;
+    root["version"] = fileVersion;
+    root["type"] = type;
+    root["activePreset"] = str(record.activePreset);
+    root["presets"] = presets;
+    root["instancePresets"] = instances;
+    return root;
+}
+
+bool recordFromJson(QJsonObject const &json, TypeRecord &record, QString &error)
+{
+    if (json["version"].toInt() != fileVersion)
+    {
+        error = QObject::tr("Unsupported file version");
+        return false;
+    }
+
+    QJsonObject const type = json["type"].toObject();
+    TypeRecord r;
+    r.type.guid = type["guid"].toString().toStdString();
+    r.type.name = type["name"].toString().toStdString();
+    r.type.numAxes = std::max(0, type["numAxes"].toInt());
+    r.type.numButtons = std::max(0, type["numButtons"].toInt());
+    r.type.numHats = std::max(0, type["numHats"].toInt());
+    if (r.type.guid.empty())
+    {
+        error = QObject::tr("Missing device type");
+        return false;
+    }
+
+    r.activePreset = json["activePreset"].toString().toStdString();
+
+    for (QJsonValue const v : json["presets"].toArray())
+    {
+        Profile p;
+        if (!profileFromJson(v.toObject(), p, error))
+        {
+            return false;
+        }
+        p.deviceGuid = r.type.guid;
+        r.presets.push_back(p);
+    }
+
+    QJsonObject const instances = json["instancePresets"].toObject();
+    for (auto it = instances.begin(); it != instances.end(); ++it)
+    {
+        r.instancePresets[it.key().toStdString()] = it.value().toString().toStdString();
+    }
+
+    record = r;
     return true;
 }

@@ -19,6 +19,9 @@ float smoothStep(float current, float target, float dtSeconds, float timeConstan
 
 float clampf(float x, float lo, float hi);
 
+// Raw -1..1 to 0..1 after invert, dead zone and curve; smoothing and quantization come later.
+float shapeAxis(Mapping const &mapping, float raw);
+
 // Input in 0..1.
 uint8_t quantize7(float x01);
 uint16_t quantize14(float x01);
