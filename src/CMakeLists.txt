@@ -10,7 +10,23 @@ message(STATUS "Building on ${CMAKE_SYSTEM_NAME}...")
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
+
+# SDL3 is built statically from the submodule with only joystick and event support
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+set(SDL_AUDIO OFF CACHE BOOL "" FORCE)
+set(SDL_VIDEO OFF CACHE BOOL "" FORCE)
+set(SDL_RENDER OFF CACHE BOOL "" FORCE)
+set(SDL_JOYSTICK ON CACHE BOOL "" FORCE)
+set(SDL_EVENTS ON CACHE BOOL "" FORCE)
+set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)
+set(SDL_SENSOR OFF CACHE BOOL "" FORCE)
+set(SDL_UNIX_CONSOLE_BUILD ON CACHE BOOL "" FORCE)
+add_subdirectory(ThirdParty/SDL EXCLUDE_FROM_ALL)
+
 pkg_check_modules(RTMIDI REQUIRED IMPORTED_TARGET rtmidi)
 
 # Qt-free core: SDL3 input, mapping engine, RtMidi output
@@ -34,7 +50,7 @@ add_library(ode2joy_core STATIC
   core/SdlInput.h
 )
 target_include_directories(ode2joy_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/core)
-target_link_libraries(ode2joy_core PUBLIC PkgConfig::SDL3 PkgConfig::RTMIDI Threads::Threads)
+target_link_libraries(ode2joy_core PUBLIC SDL3::SDL3-static PkgConfig::RTMIDI Threads::Threads)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_compile_options(ode2joy_core PRIVATE -Wall -Wno-long-long -pedantic)

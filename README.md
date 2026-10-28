@@ -40,7 +40,7 @@ The application requires the following development tools and libraries:
 * CMake 3.16 or newer
 * A C++17 compiler
 * Qt 6 Widgets
-* SDL3
+* SDL3 (built statically from the `src/ThirdParty/SDL` git submodule)
 * RtMidi
 * pkg-config
 
@@ -53,12 +53,14 @@ Here are some tips if you want to get involved in the development of *ode2joy*.
 On Debian or Ubuntu, install the required packages with:
 
 ```sh
-sudo apt install git build-essential cmake pkg-config qt6-base-dev libsdl3-dev librtmidi-dev
+sudo apt install git build-essential cmake pkg-config qt6-base-dev librtmidi-dev libudev-dev
 ```
 
 #### Cloning of the repository
 Use the following command to clone the git repository:
-> git clone https://github.com/michaelgregorius/ode2joy.git
+> git clone --recurse-submodules https://github.com/michaelgregorius/ode2joy.git
+
+For an existing clone run `git submodule update --init`.
 
 #### Building the application from source
 From the repository root, configure, build, and run the tests with:
