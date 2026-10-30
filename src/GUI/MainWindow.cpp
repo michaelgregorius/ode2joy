@@ -160,6 +160,7 @@ void MainWindow::onActionEditMappings()
     std::string const guid = m_deviceList->selectedDevice(device) ? device.guid : std::string();
 
     MappingEditorDialog dialog(m_library, *m_store, [this]() { m_pipeline->reloadProfiles(); }, guid, this);
+    connect(m_bridge.get(), &PipelineBridge::controlActivity, &dialog, &MappingEditorDialog::onControlActivity);
     dialog.exec();
 
     refreshPresetChoices();

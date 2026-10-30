@@ -10,6 +10,10 @@ DeviceType deviceTypeOf(DeviceInfo const &device)
     t.numAxes = device.numAxes;
     t.numButtons = device.numButtons;
     t.numHats = device.numHats;
+    t.leftStickX = device.leftStickX;
+    t.leftStickY = device.leftStickY;
+    t.rightStickX = device.rightStickX;
+    t.rightStickY = device.rightStickY;
     return t;
 }
 
@@ -55,20 +59,26 @@ Profile makeDefaultProfile(DeviceType const &type)
         }
     }
 
-    if (type.numAxes >= 2)
+    // Without gamepad information, assume axes 0/1 and 2/3 are the sticks.
+    auto const pick = [&type](int value, int fallback) {
+        return value >= 0 && value < type.numAxes ? value : fallback;
+    };
+    bool const known = type.leftStickX >= 0 || type.rightStickX >= 0;
+
+    if (known ? (type.leftStickX >= 0 && type.leftStickY >= 0) : type.numAxes >= 2)
     {
         Stick left;
         left.label = "Left stick";
-        left.xAxis = 0;
-        left.yAxis = 1;
+        left.xAxis = pick(type.leftStickX, 0);
+        left.yAxis = pick(type.leftStickY, 1);
         p.sticks.push_back(left);
     }
-    if (type.numAxes >= 4)
+    if (known ? (type.rightStickX >= 0 && type.rightStickY >= 0) : type.numAxes >= 4)
     {
         Stick right;
         right.label = "Right stick";
-        right.xAxis = 2;
-        right.yAxis = 3;
+        right.xAxis = pick(type.rightStickX, 2);
+        right.yAxis = pick(type.rightStickY, 3);
         p.sticks.push_back(right);
     }
 

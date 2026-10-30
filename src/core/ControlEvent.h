@@ -48,6 +48,11 @@ struct DeviceInfo
     int numAxes = 0;
     int numButtons = 0;
     int numHats = 0;
+    // Axis indices of the sticks, -1 if unknown.
+    int leftStickX = -1;
+    int leftStickY = -1;
+    int rightStickX = -1;
+    int rightStickY = -1;
     int instance = 1;   // 1-based number among connected devices with the same GUID.
 };
 

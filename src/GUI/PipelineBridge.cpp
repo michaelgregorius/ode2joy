@@ -26,6 +26,11 @@ void PipelineBridge::onActivity(DeviceId id)
     emit activity(id);
 }
 
+void PipelineBridge::onControlActivity(DeviceInfo const &info, ControlEvent const &event)
+{
+    emit controlActivity(QString::fromStdString(info.guid), static_cast<int>(event.type), event.index, event.value);
+}
+
 void PipelineBridge::onError(std::string const &message)
 {
     emit error(QString::fromStdString(message));

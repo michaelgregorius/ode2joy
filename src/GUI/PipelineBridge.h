@@ -20,6 +20,7 @@ public:
     void onDeviceDisconnected(DeviceId id) override;
     void onDeviceProfileChanged(DeviceId id, std::string const &profileName) override;
     void onActivity(DeviceId id) override;
+    void onControlActivity(DeviceInfo const &info, ControlEvent const &event) override;
     void onError(std::string const &message) override;
 
 signals:
@@ -27,6 +28,7 @@ signals:
     void deviceDisconnected(quint32 id);
     void deviceProfileChanged(quint32 id, QString profileName);
     void activity(quint32 id);
+    void controlActivity(QString guid, int type, int index, float value);
     void error(QString message);
 };
 

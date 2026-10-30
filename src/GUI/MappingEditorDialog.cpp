@@ -25,6 +25,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 #include <tuple>
 
 namespace
@@ -120,6 +121,10 @@ MappingEditorDialog::MappingEditorDialog(std::shared_ptr<ProfileLibrary> library
     m_applyTimer.setSingleShot(true);
     m_applyTimer.setInterval(100);
     connect(&m_applyTimer, &QTimer::timeout, this, &MappingEditorDialog::applyNow);
+
+    m_clock.start();
+    m_flashTimer.setInterval(50);
+    connect(&m_flashTimer, &QTimer::timeout, this, &MappingEditorDialog::updateFlashes);
 
     for (TypeRecord const &r : m_library->records())
     {
@@ -561,6 +566,8 @@ void MappingEditorDialog::onTypeChanged()
 {
     QListWidgetItem *item = m_typeList->currentItem();
     m_guid = item ? item->data(Qt::UserRole).toString().toStdString() : std::string();
+    m_lastAxis.clear();
+    m_lastHat.clear();
 
     TypeRecord *r = currentRecord();
     if (!r)
@@ -732,6 +739,128 @@ void MappingEditorDialog::refreshTable()
 void MappingEditorDialog::onControlChanged()
 {
     loadForm();
+}
+
+// ---- Activity indicator ----
+
+void MappingEditorDialog::onControlActivity(QString const &guid, int type, int index, float value)
+{
+    if (guid.toStdString() != m_guid)
+    {
+        return;
+    }
+
+    auto findRow = [this](ControlType t, int i, HatComponent hat) {
+        for (size_t row = 0; row < m_rows.size(); ++row)
+        {
+            ControlKey const &k = m_rows[row];
+            if (k.type == t && k.index == i && (t != ControlType::Hat || k.hat == hat))
+            {
+                return static_cast<int>(row);
+            }
+        }
+        return -1;
+    };
+
+    switch (static_cast<ControlType>(type))
+    {
+    case ControlType::Axis:
+    {
+        // The first value only sets the baseline, small jitter is ignored.
+        auto it = m_lastAxis.find(index);
+        if (it == m_lastAxis.end())
+        {
+            m_lastAxis[index] = value;
+        }
+        else if (std::abs(value - it->second) > 0.05f)
+        {
+            it->second = value;
+            flashRow(findRow(ControlType::Axis, index, HatComponent::X), false);
+        }
+        break;
+    }
+    case ControlType::Button:
+        flashRow(findRow(ControlType::Button, index, HatComponent::X), value > 0.5f);
+        break;
+    case ControlType::Hat:
+    {
+        int const mask = static_cast<int>(value);
+        int const changed = mask ^ m_lastHat[index];
+        m_lastHat[index] = mask;
+
+        struct { int bit; HatComponent component; } const dirs[] = {
+            { HatUp, HatComponent::Up }, { HatRight, HatComponent::Right },
+            { HatDown, HatComponent::Down }, { HatLeft, HatComponent::Left } };
+        for (auto const &d : dirs)
+        {
+            if (changed & d.bit)
+            {
+                flashRow(findRow(ControlType::Hat, index, d.component), (mask & d.bit) != 0);
+            }
+        }
+        if (changed & (HatLeft | HatRight))
+        {
+            flashRow(findRow(ControlType::Hat, index, HatComponent::X), false);
+        }
+        if (changed & (HatUp | HatDown))
+        {
+            flashRow(findRow(ControlType::Hat, index, HatComponent::Y), false);
+        }
+        break;
+    }
+    }
+}
+
+void MappingEditorDialog::flashRow(int row, bool scroll)
+{
+    if (row < 0 || row >= m_controlTable->rowCount())
+    {
+        return;
+    }
+
+    m_flashes[row] = m_clock.elapsed();
+    for (int col = 0; col < ColCount; ++col)
+    {
+        if (QTableWidgetItem *item = m_controlTable->item(row, col))
+        {
+            item->setBackground(QBrush(QColor(80, 200, 80)));
+        }
+    }
+    if (scroll)
+    {
+        m_controlTable->scrollToItem(m_controlTable->item(row, ColControl));
+    }
+    if (!m_flashTimer.isActive())
+    {
+        m_flashTimer.start();
+    }
+}
+
+void MappingEditorDialog::updateFlashes()
+{
+    qint64 const now = m_clock.elapsed();
+    for (auto it = m_flashes.begin(); it != m_flashes.end();)
+    {
+        if (now - it->second > 400)
+        {
+            for (int col = 0; col < ColCount; ++col)
+            {
+                if (QTableWidgetItem *item = m_controlTable->item(it->first, col))
+                {
+                    item->setBackground(QBrush());
+                }
+            }
+            it = m_flashes.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    if (m_flashes.empty())
+    {
+        m_flashTimer.stop();
+    }
 }
 
 void MappingEditorDialog::loadForm()

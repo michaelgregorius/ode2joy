@@ -2,7 +2,10 @@
 
 #include <SDL3/SDL.h>
 
+#include <cctype>
+#include <cstdlib>
 #include <set>
+#include <string>
 
 namespace
 {
@@ -10,6 +13,27 @@ namespace
 float normalizeAxis(Sint16 v)
 {
     return v < 0 ? static_cast<float>(v) / 32768.0f : static_cast<float>(v) / 32767.0f;
+}
+
+// Joystick axis bound to a gamepad axis name in the SDL mapping (e.g. "rightx:a3"), or -1.
+int mappedAxis(std::string const &mapping, std::string const &name)
+{
+    std::string const key = "," + name + ":";
+    size_t pos = mapping.find(key);
+    if (pos == std::string::npos)
+    {
+        return -1;
+    }
+    pos += key.size();
+    while (pos < mapping.size() && (mapping[pos] == '+' || mapping[pos] == '-'))
+    {
+        ++pos;
+    }
+    if (pos + 1 >= mapping.size() || mapping[pos] != 'a' || !isdigit(static_cast<unsigned char>(mapping[pos + 1])))
+    {
+        return -1;
+    }
+    return atoi(mapping.c_str() + pos + 1);
 }
 
 } // namespace
@@ -28,7 +52,7 @@ bool SdlInput::init(std::string &error)
 {
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
-    if (!SDL_Init(SDL_INIT_JOYSTICK))
+    if (!SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD))
     {
         error = SDL_GetError();
         return false;
@@ -51,7 +75,7 @@ void SdlInput::shutdown()
     }
     m_joysticks.clear();
 
-    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_GAMEPAD);
     m_initialized = false;
 }
 
@@ -86,6 +110,16 @@ void SdlInput::handleAdded(DeviceId id, InputListener &listener)
     info.numAxes = SDL_GetNumJoystickAxes(joystick);
     info.numButtons = SDL_GetNumJoystickButtons(joystick);
     info.numHats = SDL_GetNumJoystickHats(joystick);
+
+    if (char *mapping = SDL_GetGamepadMappingForID(id))
+    {
+        std::string const m = mapping;
+        SDL_free(mapping);
+        info.leftStickX = mappedAxis(m, "leftx");
+        info.leftStickY = mappedAxis(m, "lefty");
+        info.rightStickX = mappedAxis(m, "rightx");
+        info.rightStickY = mappedAxis(m, "righty");
+    }
 
     // Smallest free instance number among devices of the same type.
     std::set<int> used;

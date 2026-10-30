@@ -4,6 +4,7 @@
 #include "core/ProfileLibrary.h"
 
 #include <QDialog>
+#include <QElapsedTimer>
 #include <QTimer>
 
 #include <functional>
@@ -38,7 +39,12 @@ public:
     void accept() override;
     void reject() override;
 
+public slots:
+    // Highlights the row of the control that was moved on the device type being edited.
+    void onControlActivity(QString const &guid, int type, int index, float value);
+
 private slots:
+    void updateFlashes();
     void onTypeChanged();
     void onPresetChanged();
     void onControlChanged();
@@ -75,6 +81,7 @@ private:
     ControlKey currentKey() const;
 
     void markDirty();
+    void flashRow(int row, bool scroll);
     void rebuildPresetList(int selectRow);
     void refreshTable();
     void refreshStickList();
@@ -101,6 +108,11 @@ private:
     std::vector<ControlKey> m_rows;
     bool m_updating;
     QTimer m_applyTimer;
+    QTimer m_flashTimer;
+    QElapsedTimer m_clock;
+    std::map<int, qint64> m_flashes;   // row -> time of last activity (ms)
+    std::map<int, float> m_lastAxis;
+    std::map<int, int> m_lastHat;
 
     QListWidget *m_typeList;
     QListWidget *m_presetList;

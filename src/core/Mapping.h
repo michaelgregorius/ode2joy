@@ -96,6 +96,10 @@ struct DeviceType
     int numAxes = 0;
     int numButtons = 0;
     int numHats = 0;
+    int leftStickX = -1;
+    int leftStickY = -1;
+    int rightStickX = -1;
+    int rightStickY = -1;
 };
 
 // Everything known about one joystick type.

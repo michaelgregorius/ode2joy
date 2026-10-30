@@ -225,6 +225,10 @@ QJsonObject recordToJson(TypeRecord const &record)
     type["numAxes"] = record.type.numAxes;
     type["numButtons"] = record.type.numButtons;
     type["numHats"] = record.type.numHats;
+    type["leftStickX"] = record.type.leftStickX;
+    type["leftStickY"] = record.type.leftStickY;
+    type["rightStickX"] = record.type.rightStickX;
+    type["rightStickY"] = record.type.rightStickY;
 
     QJsonArray presets;
     for (Profile const &p : record.presets)
@@ -262,6 +266,10 @@ bool recordFromJson(QJsonObject const &json, TypeRecord &record, QString &error)
     r.type.numAxes = std::max(0, type["numAxes"].toInt());
     r.type.numButtons = std::max(0, type["numButtons"].toInt());
     r.type.numHats = std::max(0, type["numHats"].toInt());
+    r.type.leftStickX = type["leftStickX"].toInt(-1);
+    r.type.leftStickY = type["leftStickY"].toInt(-1);
+    r.type.rightStickX = type["rightStickX"].toInt(-1);
+    r.type.rightStickY = type["rightStickY"].toInt(-1);
     if (r.type.guid.empty())
     {
         error = QObject::tr("Missing device type");

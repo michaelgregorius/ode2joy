@@ -225,6 +225,24 @@ void Pipeline::onControlEvent(ControlEvent const &event)
     flushOutputs(m_events, event.device);
 
     Device &device = it->second;
+    if (m_listener)
+    {
+        bool notify = true;
+        if (event.type == ControlType::Axis)
+        {
+            uint64_t &last = device.lastAxisNotify[event.index];
+            notify = event.timestamp - last >= activityIntervalNs;
+            if (notify)
+            {
+                last = event.timestamp;
+            }
+        }
+        if (notify)
+        {
+            m_listener->onControlActivity(device.info, event);
+        }
+    }
+
     if (m_listener && event.timestamp - device.lastActivityNotify >= activityIntervalNs)
     {
         device.lastActivityNotify = event.timestamp;

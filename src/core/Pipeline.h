@@ -25,6 +25,8 @@ public:
     virtual void onDeviceProfileChanged(DeviceId, std::string const & /*profileName*/) {}
     // Throttled; signals that a control of the device moved.
     virtual void onActivity(DeviceId) {}
+    // Buttons and hats are reported on every change, axes are throttled per axis.
+    virtual void onControlActivity(DeviceInfo const &, ControlEvent const &) {}
     virtual void onError(std::string const &) {}
 };
 
@@ -57,6 +59,7 @@ private:
         std::unique_ptr<MidiOutput> output;
         bool enabled = true;
         uint64_t lastActivityNotify = 0;
+        std::map<int, uint64_t> lastAxisNotify;
     };
 
     void post(std::function<void()> command);
