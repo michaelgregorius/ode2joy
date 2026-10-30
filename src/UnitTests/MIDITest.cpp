@@ -22,6 +22,7 @@
 #include "core/Pipeline.h"
 #include "core/Processing.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -523,6 +524,36 @@ int test_button_note_tracking()
     return (out.size() == 1 && out[0].getStatus() == MIDIEvent::NoteOff && out[0].getNote() == 60) ? 0 : error;
 }
 
+int test_mmc_button()
+{
+    for (int command = 1; command <= 9; ++command)
+    {
+        Mapping m;
+        m.source.type = ControlType::Button;
+        m.source.index = 0;
+        m.target.kind = MidiTargetKind::Mmc;
+        m.target.number = static_cast<uint8_t>(command);
+        m.target.deviceId = 5;
+
+        MappingEngine engine;
+        install(engine, { m });
+
+        MappingEngine::Events out = run(engine, ev(ControlType::Button, 0, 1.0f, 0));
+        uint8_t const expected[] = { 0xF0, 0x7F, 5, 0x06, static_cast<uint8_t>(command), 0xF7 };
+        if (out.size() != 1 || !out[0].isSysEx() || out[0].getSysExSize() != sizeof(expected)
+            || !std::equal(expected, expected + sizeof(expected), out[0].getSysExBytes()))
+        {
+            return error;
+        }
+
+        if (!run(engine, ev(ControlType::Button, 0, 0.0f, ms)).empty())
+        {
+            return error;
+        }
+    }
+    return 0;
+}
+
 int test_release_on_remove()
 {
     MappingEngine engine;
@@ -904,7 +935,8 @@ int main (int argc, char **argv)
         { "test_default_profile_axes", test_default_profile_axes },
         { "test_shape_axis", test_shape_axis },
         { "test_x_and_y_use_different_ccs", test_x_and_y_use_different_ccs },
-        { "test_radial_dead_zone", test_radial_dead_zone }
+        { "test_radial_dead_zone", test_radial_dead_zone },
+        { "test_mmc_button", test_mmc_button }
     };
 
     if (argc == 2)

@@ -22,8 +22,24 @@
 MIDIEvent::MIDIEvent() :
     m_status(NoteOff),
     m_data1(0),
-    m_data2(0)
+    m_data2(0),
+    m_sysExSize(0)
 {
+}
+
+MIDIEvent MIDIEvent::makeMmc(uint8_t deviceId, uint8_t command)
+{
+    MIDIEvent e;
+    e.m_status = 0xF0;
+    // Universal real-time (7F), device, MMC command (06), command
+    uint8_t const bytes[] = { 0xF0, 0x7F, static_cast<uint8_t>(deviceId & 0x7F), 0x06,
+                              static_cast<uint8_t>(command & 0x7F), 0xF7 };
+    for (size_t i = 0; i < sizeof(bytes); ++i)
+    {
+        e.m_sysEx[i] = bytes[i];
+    }
+    e.m_sysExSize = sizeof(bytes);
+    return e;
 }
 
 MIDIEvent::~MIDIEvent()

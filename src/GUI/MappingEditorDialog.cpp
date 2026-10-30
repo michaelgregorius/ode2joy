@@ -35,6 +35,36 @@ enum Column { ColControl, ColMessage, ColChannel, ColNumber, ColCount };
 
 QString const hatNames[] = { "X", "Y", "Up", "Right", "Down", "Left" };
 
+struct MmcCommand
+{
+    int code;
+    char const *name;
+};
+
+MmcCommand const mmcCommands[] = {
+    { 0x01, QT_TRANSLATE_NOOP("MappingEditorDialog", "Stop") },
+    { 0x02, QT_TRANSLATE_NOOP("MappingEditorDialog", "Play") },
+    { 0x03, QT_TRANSLATE_NOOP("MappingEditorDialog", "Deferred play") },
+    { 0x04, QT_TRANSLATE_NOOP("MappingEditorDialog", "Fast forward") },
+    { 0x05, QT_TRANSLATE_NOOP("MappingEditorDialog", "Rewind") },
+    { 0x06, QT_TRANSLATE_NOOP("MappingEditorDialog", "Record strobe (punch in)") },
+    { 0x07, QT_TRANSLATE_NOOP("MappingEditorDialog", "Record exit (punch out)") },
+    { 0x08, QT_TRANSLATE_NOOP("MappingEditorDialog", "Record pause") },
+    { 0x09, QT_TRANSLATE_NOOP("MappingEditorDialog", "Pause") },
+};
+
+QString mmcCommandName(int code)
+{
+    for (MmcCommand const &c : mmcCommands)
+    {
+        if (c.code == code)
+        {
+            return QObject::tr(c.name);
+        }
+    }
+    return QString();
+}
+
 QString kindName(MidiTargetKind kind)
 {
     switch (kind)
@@ -44,6 +74,7 @@ QString kindName(MidiTargetKind kind)
     case MidiTargetKind::PitchBend: return QObject::tr("Pitch bend");
     case MidiTargetKind::ProgramChange: return QObject::tr("Program change");
     case MidiTargetKind::ChannelAftertouch: return QObject::tr("Channel aftertouch");
+    case MidiTargetKind::Mmc: return QObject::tr("MMC");
     }
     return QString();
 }
@@ -240,11 +271,24 @@ void MappingEditorDialog::buildUi()
     m_channelSpin = makeSpin(1, 16);
     m_numberLabel = new QLabel(tr("Number"));
     m_numberSpin = makeSpin(0, 127);
+    m_mmcLabel = new QLabel(tr("Command"));
+    m_mmcCombo = new QComboBox();
+    for (MmcCommand const &c : mmcCommands)
+    {
+        m_mmcCombo->addItem(tr(c.name), c.code);
+    }
+    m_deviceIdLabel = new QLabel(tr("Device ID"));
+    m_deviceIdSpin = makeSpin(0, 127);
+    m_deviceIdSpin->setValue(127);
+    m_deviceIdSpin->setToolTip(tr("127 addresses all devices"));
     m_invertCheck = new QCheckBox(tr("Invert"));
     common->addRow(tr("Message"), m_kindCombo);
     common->addRow(tr("Channel"), m_channelSpin);
     common->addRow(m_numberLabel, m_numberSpin);
+    common->addRow(m_mmcLabel, m_mmcCombo);
+    common->addRow(m_deviceIdLabel, m_deviceIdSpin);
     common->addRow(m_invertCheck);
+    m_commonForm = common;
     groupLayout->addLayout(common);
 
     m_discreteGroup = new QGroupBox(tr("Button values"));
@@ -345,6 +389,8 @@ void MappingEditorDialog::buildUi()
     connect(m_kindCombo, &QComboBox::currentIndexChanged, this, &MappingEditorDialog::formChanged);
     connect(m_channelSpin, &QSpinBox::valueChanged, this, &MappingEditorDialog::formChanged);
     connect(m_numberSpin, &QSpinBox::valueChanged, this, &MappingEditorDialog::formChanged);
+    connect(m_mmcCombo, &QComboBox::currentIndexChanged, this, &MappingEditorDialog::formChanged);
+    connect(m_deviceIdSpin, &QSpinBox::valueChanged, this, &MappingEditorDialog::formChanged);
     connect(m_onSpin, &QSpinBox::valueChanged, this, &MappingEditorDialog::formChanged);
     connect(m_offSpin, &QSpinBox::valueChanged, this, &MappingEditorDialog::formChanged);
     connect(m_rangeCombo, &QComboBox::currentIndexChanged, this, &MappingEditorDialog::formChanged);
@@ -506,6 +552,10 @@ QString MappingEditorDialog::controlName(Profile const &preset, ControlKey const
 
 QString MappingEditorDialog::mappingText(Mapping const *mapping) const
 {
+    if (mapping && mapping->target.kind == MidiTargetKind::Mmc)
+    {
+        return kindName(mapping->target.kind) + ": " + mmcCommandName(mapping->target.number);
+    }
     return mapping ? kindName(mapping->target.kind) : QString::fromUtf8("\xE2\x80\x94");
 }
 
@@ -704,6 +754,10 @@ void MappingEditorDialog::refreshTable()
         if (m)
         {
             channel = QString::number(m->target.channel + 1);
+            if (m->target.kind == MidiTargetKind::Mmc)
+            {
+                channel.clear();
+            }
             if (m->target.kind == MidiTargetKind::ControlChange || m->target.kind == MidiTargetKind::Note
                 || m->target.kind == MidiTargetKind::ProgramChange)
             {
@@ -891,12 +945,18 @@ void MappingEditorDialog::loadForm()
         }
         m_kindCombo->addItem(kindName(MidiTargetKind::ProgramChange), static_cast<int>(MidiTargetKind::ProgramChange));
         m_kindCombo->addItem(kindName(MidiTargetKind::ChannelAftertouch), static_cast<int>(MidiTargetKind::ChannelAftertouch));
+        if (!isAnalog(key))
+        {
+            m_kindCombo->addItem(kindName(MidiTargetKind::Mmc), static_cast<int>(MidiTargetKind::Mmc));
+        }
 
         if (m)
         {
             m_kindCombo->setCurrentIndex(std::max(0, m_kindCombo->findData(static_cast<int>(m->target.kind))));
             m_channelSpin->setValue(m->target.channel + 1);
             m_numberSpin->setValue(m->target.number);
+            m_mmcCombo->setCurrentIndex(std::max(0, m_mmcCombo->findData(m->target.number)));
+            m_deviceIdSpin->setValue(m->target.deviceId);
             m_onSpin->setValue(m->target.onValue);
             m_offSpin->setValue(m->target.offValue);
             m_invertCheck->setChecked(m->invert);
@@ -939,6 +999,12 @@ void MappingEditorDialog::updateFormState()
     m_discreteGroup->setVisible(!analog);
 
     MidiTargetKind const kind = static_cast<MidiTargetKind>(m_kindCombo->currentData().toInt());
+    bool const mmc = kind == MidiTargetKind::Mmc;
+    m_discreteGroup->setVisible(!analog && !mmc);
+    m_commonForm->setRowVisible(m_channelSpin, !mmc);
+    m_commonForm->setRowVisible(m_numberSpin, !mmc);
+    m_commonForm->setRowVisible(m_mmcCombo, mmc);
+    m_commonForm->setRowVisible(m_deviceIdSpin, mmc);
     bool const hasNumber = kind == MidiTargetKind::ControlChange || kind == MidiTargetKind::Note
         || kind == MidiTargetKind::ProgramChange;
     m_numberSpin->setEnabled(hasNumber);
@@ -1020,6 +1086,11 @@ void MappingEditorDialog::formChanged()
         m->target.kind = static_cast<MidiTargetKind>(m_kindCombo->currentData().toInt());
         m->target.channel = static_cast<uint8_t>(m_channelSpin->value() - 1);
         m->target.number = static_cast<uint8_t>(m_numberSpin->value());
+        if (m->target.kind == MidiTargetKind::Mmc)
+        {
+            m->target.number = static_cast<uint8_t>(m_mmcCombo->currentData().toInt());
+        }
+        m->target.deviceId = static_cast<uint8_t>(m_deviceIdSpin->value());
         m->target.onValue = static_cast<uint8_t>(m_onSpin->value());
         m->target.offValue = static_cast<uint8_t>(m_offSpin->value());
         m->invert = m_invertCheck->isChecked();

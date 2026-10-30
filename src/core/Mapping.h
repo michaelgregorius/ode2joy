@@ -14,14 +14,16 @@ enum class MidiTargetKind
     Note,
     PitchBend,
     ProgramChange,
-    ChannelAftertouch
+    ChannelAftertouch,
+    Mmc // Sends MIDI Machine Control command `number`; buttons only
 };
 
 struct MidiTarget
 {
     MidiTargetKind kind = MidiTargetKind::ControlChange;
     uint8_t channel = 0;  // 0-based
-    uint8_t number = 0;   // Controller, note or program number
+    uint8_t number = 0;   // Controller, note, program number or MMC command
+    uint8_t deviceId = 0x7F; // MMC device id; 0x7F addresses all devices
     uint8_t onValue = 127;  // Button pressed: velocity or CC value
     uint8_t offValue = 0;   // Button released: CC value
 };

@@ -25,7 +25,7 @@ Name<HatComponent> const hatComponents[] = {
 Name<MidiTargetKind> const targetKinds[] = {
     { MidiTargetKind::ControlChange, "cc" }, { MidiTargetKind::Note, "note" },
     { MidiTargetKind::PitchBend, "pitchBend" }, { MidiTargetKind::ProgramChange, "programChange" },
-    { MidiTargetKind::ChannelAftertouch, "aftertouch" } };
+    { MidiTargetKind::ChannelAftertouch, "aftertouch" }, { MidiTargetKind::Mmc, "mmc" } };
 Name<CurveType> const curveTypes[] = {
     { CurveType::Linear, "linear" }, { CurveType::Exponential, "exponential" },
     { CurveType::Logarithmic, "logarithmic" } };
@@ -88,6 +88,7 @@ QJsonObject profileToJson(Profile const &profile)
         target["kind"] = toName(targetKinds, m.target.kind);
         target["channel"] = m.target.channel + 1;
         target["number"] = m.target.number;
+        target["deviceId"] = m.target.deviceId;
         target["onValue"] = m.target.onValue;
         target["offValue"] = m.target.offValue;
 
@@ -176,6 +177,7 @@ bool profileFromJson(QJsonObject const &json, Profile &profile, QString &error)
 
         m.target.channel = static_cast<uint8_t>(std::max(0, std::min(15, target["channel"].toInt(1) - 1)));
         m.target.number = clampByte(target["number"].toInt());
+        m.target.deviceId = std::min<uint8_t>(127, clampByte(target["deviceId"].toInt(127)));
         m.target.onValue = clampByte(target["onValue"].toInt(127));
         m.target.offValue = clampByte(target["offValue"].toInt(0));
 

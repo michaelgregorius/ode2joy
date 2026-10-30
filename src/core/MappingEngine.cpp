@@ -34,6 +34,8 @@ MIDIEvent makeEvent(MidiTarget const &target, int value)
         break;
     case MidiTargetKind::Note:
         break;
+    case MidiTargetKind::Mmc:
+        return MIDIEvent::makeMmc(target.deviceId, target.number);
     }
 
     return e;
@@ -51,7 +53,7 @@ MIDIEvent makeNote(MIDIEvent::Status status, uint8_t channel, uint8_t note, uint
 
 bool isContinuous(MidiTargetKind kind)
 {
-    return kind != MidiTargetKind::Note;
+    return kind != MidiTargetKind::Note && kind != MidiTargetKind::Mmc;
 }
 
 int quantizeFor(MidiTarget const &target, float x01)
@@ -316,6 +318,13 @@ void MappingEngine::processButton(Mapping const &m, MappingState &s, bool presse
         if (pressed)
         {
             out.push_back(makeEvent(m.target, m.target.number));
+        }
+        break;
+
+    case MidiTargetKind::Mmc:
+        if (pressed)
+        {
+            out.push_back(makeEvent(m.target, 0));
         }
         break;
 

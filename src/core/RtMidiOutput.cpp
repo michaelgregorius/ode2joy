@@ -20,6 +20,19 @@ public:
     void send(MIDIEvent const &event) override
     {
         m_message.clear();
+        if (event.isSysEx())
+        {
+            m_message.assign(event.getSysExBytes(), event.getSysExBytes() + event.getSysExSize());
+            try
+            {
+                m_out.sendMessage(&m_message);
+            }
+            catch (RtMidiError &)
+            {
+            }
+            return;
+        }
+
         m_message.push_back(event.getStatusByte());
         m_message.push_back(event.getData1Byte());
 

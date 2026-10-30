@@ -152,6 +152,7 @@ set(ODE2JOY_TESTS
   test_shape_axis
   test_x_and_y_use_different_ccs
   test_radial_dead_zone
+  test_mmc_button
 )
 
 foreach(t ${ODE2JOY_TESTS})

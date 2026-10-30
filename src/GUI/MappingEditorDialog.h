@@ -17,6 +17,7 @@ class ProfileStore;
 class QCheckBox;
 class QComboBox;
 class QDoubleSpinBox;
+class QFormLayout;
 class QGroupBox;
 class QLabel;
 class QLineEdit;
@@ -125,8 +126,13 @@ private:
     QCheckBox *m_invertCheck;
     QComboBox *m_kindCombo;
     QSpinBox *m_channelSpin;
+    QFormLayout *m_commonForm;
     QLabel *m_numberLabel;
     QSpinBox *m_numberSpin;
+    QLabel *m_mmcLabel;
+    QComboBox *m_mmcCombo;
+    QLabel *m_deviceIdLabel;
+    QSpinBox *m_deviceIdSpin;
 
     QGroupBox *m_discreteGroup;
     QLabel *m_onLabel;

@@ -21,6 +21,7 @@
 #define MIDIEVENT_H_
 
 #include <cstdint>
+#include <cstddef>
 
 
 class MIDIEvent
@@ -80,6 +81,13 @@ public:
     inline uint8_t getData1Byte() const { return m_data1; }
     inline uint8_t getData2Byte() const { return m_data2; }
 
+    // Complete MMC command message (F0 7F <device> 06 <command> F7).
+    static MIDIEvent makeMmc(uint8_t deviceId, uint8_t command);
+
+    inline bool isSysEx() const { return m_sysExSize > 0; }
+    inline uint8_t const *getSysExBytes() const { return m_sysEx; }
+    inline size_t getSysExSize() const { return m_sysExSize; }
+
 private:
     inline uint8_t getData(uint8_t const & data) const { return data & 0x7F; }
 
@@ -96,6 +104,8 @@ private:
     uint8_t m_status; // Always starts with a 1
     uint8_t m_data1; // Always starts with a 0
     uint8_t m_data2; // Always starts with a 0
+    uint8_t m_sysEx[6];
+    size_t m_sysExSize; // 0 for non-SysEx events
 };
 
 #endif /* MIDIEVENT_H_ */
